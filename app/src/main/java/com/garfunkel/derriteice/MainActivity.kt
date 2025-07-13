@@ -83,7 +83,7 @@ class MainActivity : AppCompatActivity() {
 
     private val LOCATION_PERMISSION_REQUEST = 1001
     private val CAMERA_PERMISSION_REQUEST = 1002
-    private val REPORT_RADIUS_METERS = 4000.0 // Reduced to ~2.5 miles
+    private val REPORT_RADIUS_METERS = 804.5 // 0.5 miles (hyper-local coverage)
     private val REPORT_DURATION_HOURS = 8L
 
     // Camera launcher for photo capture
@@ -462,7 +462,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun addReportToMap(report: Report) {
-        // Create red circle overlay (5-mile radius)
+        // Create red circle overlay (0.5-mile radius)
         val circle = createReportCircle(report.location)
         mapView.overlays.add(circle)
         reportCircles.add(circle)
@@ -497,7 +497,7 @@ class MainActivity : AppCompatActivity() {
     private fun createReportCircle(center: GeoPoint): Polygon {
         val circle = Polygon()
 
-        // Create circle points (5-mile radius)
+        // Create circle points (0.5-mile radius)
         val points = mutableListOf<GeoPoint>()
         val earthRadius = 6371000.0 // Earth radius in meters
         val radiusInDegrees = REPORT_RADIUS_METERS / earthRadius * (180.0 / Math.PI)

@@ -1,31 +1,31 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <!-- Base application theme -->
-    <style name="Base.Theme.DerriteIce" parent="Theme.Material3.DayNight.NoActionBar">
-        <item name="android:navigationBarColor">@color/black</item>
+    <!-- Custom Red Button Style -->
+    <style name="RedButton" parent="Widget.Material3.Button">
+        <item name="backgroundTint">@color/button_primary</item>
+        <item name="android:textColor">@android:color/white</item>
+        <item name="rippleColor">@color/primary_dark</item>
     </style>
 
-    <style name="Theme.DerriteIce" parent="Base.Theme.DerriteIce" />
-
-    <!-- Full Screen theme for MainActivity -->
-    <style name="Theme.DerriteIce.NoActionBar" parent="Theme.Material3.DayNight.NoActionBar">
-        <item name="windowActionBar">false</item>
-        <item name="windowNoTitle">true</item>
-        <item name="android:windowFullscreen">true</item>
-        <item name="android:statusBarColor">@android:color/transparent</item>
-        <item name="android:windowLightStatusBar">false</item>
-        <item name="android:navigationBarColor">@color/black</item>
-        <item name="android:windowLayoutInDisplayCutoutMode">shortEdges</item>
-        <item name="android:fitsSystemWindows">false</item>
-        <item name="android:windowTranslucentStatus">true</item>
-        <item name="android:windowTranslucentNavigation">false</item>
+    <!-- Custom Black Button Style -->
+    <style name="BlackButton" parent="Widget.Material3.Button">
+        <item name="backgroundTint">@color/button_secondary</item>
+        <item name="android:textColor">@android:color/white</item>
+        <item name="rippleColor">#333333</item>
     </style>
 
-    <!-- Subtle FAB style -->
-    <style name="Widget.App.FloatingActionButton" parent="Widget.Material3.FloatingActionButton.Primary">
-        <item name="backgroundTint">#6C7B7F</item>
-        <item name="tint">@android:color/white</item>
-        <item name="elevation">8dp</item>
-        <item name="android:layout_margin">16dp</item>
+    <!-- Custom Text Button Style -->
+    <style name="CustomTextButton" parent="Widget.Material3.Button.TextButton">
+        <item name="android:textColor">@color/text_primary</item>
+        <item name="rippleColor">#EEEEEE</item>
+    </style>
+
+    <!-- Custom White Button Style -->
+    <style name="WhiteButton" parent="Widget.Material3.Button">
+        <item name="backgroundTint">@android:color/white</item>
+        <item name="android:textColor">@color/text_primary</item>
+        <item name="rippleColor">#EEEEEE</item>
+        <item name="strokeColor">@color/border_color</item>
+        <item name="strokeWidth">1dp</item>
     </style>
 </resources>
