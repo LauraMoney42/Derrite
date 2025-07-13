@@ -1,11 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <androidx.coordinatorlayout.widget.CoordinatorLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
-    xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
-    android:layout_height="match_parent"
-    android:fitsSystemWindows="false"
-    tools:context=".MainActivity">
+    android:layout_height="match_parent">
 
     <!-- Map View -->
     <org.osmdroid.views.MapView
@@ -23,14 +20,14 @@
         android:visibility="gone"
         app:cardCornerRadius="8dp"
         app:cardElevation="4dp"
-        app:layout_anchor="@id/mapView"
-        app:layout_anchorGravity="top">
+        app:layout_behavior="@string/appbar_scrolling_view_behavior">
 
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="horizontal"
-            android:padding="16dp">
+            android:padding="16dp"
+            android:gravity="center_vertical">
 
             <TextView
                 android:id="@+id/status_text"
@@ -45,115 +42,85 @@
                 android:layout_width="24dp"
                 android:layout_height="24dp"
                 android:background="?attr/selectableItemBackgroundBorderless"
-                android:src="@android:drawable/ic_menu_close_clear_cancel" />
+                android:src="@android:drawable/ic_menu_close_clear_cancel"
+                android:contentDescription="@string/close_status" />
 
         </LinearLayout>
 
     </com.google.android.material.card.MaterialCardView>
 
-    <!-- Instruction Overlay -->
+    <!-- Instruction Overlay - No Close Button -->
     <LinearLayout
         android:id="@+id/instruction_overlay"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_margin="24dp"
-        android:background="#F5F5F5"
-        android:orientation="vertical"
+        android:layout_marginTop="80dp"
+        android:layout_marginStart="16dp"
+        android:layout_marginEnd="16dp"
+        android:background="@drawable/rounded_background"
         android:padding="16dp"
-        android:visibility="visible"
-        android:layout_gravity="center">
+        android:gravity="center">
 
         <TextView
-            android:layout_width="match_parent"
+            android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="📍 Long press anywhere on the map to create anonymous reports"
+            android:text="@string/instruction_text"
+            android:textColor="@android:color/white"
             android:textSize="14sp"
             android:gravity="center" />
 
     </LinearLayout>
 
-    <!-- Find My Location FAB -->
+    <!-- Location FAB - Top Right -->
     <com.google.android.material.floatingactionbutton.FloatingActionButton
         android:id="@+id/fab_location"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
+        android:layout_gravity="end|top"
         android:layout_margin="16dp"
-        android:layout_marginBottom="72dp"
-        android:src="@android:drawable/ic_menu_mylocation"
-        android:contentDescription="Find my location"
-        app:tint="@android:color/white"
-        app:backgroundTint="#6C7B7F"
-        app:elevation="8dp"
-        app:layout_anchor="@id/mapView"
-        app:layout_anchorGravity="bottom|end" />
+        android:src="@drawable/ic_my_location_white"
+        android:contentDescription="@string/location_button"
+        app:backgroundTint="@color/black" />
 
-    <!-- Bottom Navigation Bar -->
+    <!-- Bottom Navigation -->
     <LinearLayout
         android:id="@+id/bottom_navigation"
         android:layout_width="match_parent"
         android:layout_height="56dp"
         android:layout_gravity="bottom"
-        android:background="#000000"
+        android:background="@android:color/black"
+        android:elevation="8dp"
         android:orientation="horizontal"
-        android:elevation="8dp">
+        android:paddingHorizontal="16dp"
+        android:gravity="center_vertical">
 
-        <LinearLayout
-            android:id="@+id/nav_alerts"
+        <!-- Language Toggle Button -->
+        <Button
+            android:id="@+id/btn_language_toggle"
+            android:layout_width="wrap_content"
+            android:layout_height="40dp"
+            android:background="@drawable/language_toggle_background_dark"
+            android:text="@string/language_toggle"
+            android:textSize="14sp"
+            android:textColor="@android:color/white"
+            android:paddingHorizontal="12dp"
+            style="@style/Widget.Material3.Button.TextButton" />
+
+        <!-- Spacer -->
+        <View
             android:layout_width="0dp"
-            android:layout_height="match_parent"
-            android:layout_weight="1"
-            android:clickable="true"
-            android:focusable="true"
-            android:background="?attr/selectableItemBackground"
-            android:gravity="center"
-            android:orientation="vertical"
-            android:padding="8dp">
+            android:layout_height="1dp"
+            android:layout_weight="1" />
 
-            <ImageView
-                android:layout_width="24dp"
-                android:layout_height="24dp"
-                android:src="@android:drawable/ic_popup_reminder"
-                android:contentDescription="Alerts"
-                app:tint="@android:color/white" />
-
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="Alerts"
-                android:textColor="@android:color/white"
-                android:textSize="10sp"
-                android:layout_marginTop="2dp" />
-
-        </LinearLayout>
-
-        <LinearLayout
-            android:id="@+id/nav_settings"
-            android:layout_width="0dp"
-            android:layout_height="match_parent"
-            android:layout_weight="1"
-            android:clickable="true"
-            android:focusable="true"
-            android:background="?attr/selectableItemBackground"
-            android:gravity="center"
-            android:orientation="vertical"
-            android:padding="8dp">
-
-            <ImageView
-                android:layout_width="24dp"
-                android:layout_height="24dp"
-                android:src="@android:drawable/ic_menu_preferences"
-                android:contentDescription="Settings"
-                app:tint="@android:color/white" />
-
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="Settings"
-                android:textColor="@android:color/white"
-                android:textSize="10sp"
-                android:layout_marginTop="2dp" />
-
-        </LinearLayout>
+        <!-- Settings Button -->
+        <ImageButton
+            android:id="@+id/btn_settings"
+            android:layout_width="48dp"
+            android:layout_height="48dp"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:src="@drawable/ic_settings"
+            android:contentDescription="@string/settings_menu"
+            app:tint="@android:color/white" />
 
     </LinearLayout>
 

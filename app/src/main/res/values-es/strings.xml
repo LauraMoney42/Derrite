@@ -1,0 +1,66 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- App Name -->
+    <string name="app_name">Reporte Seguro</string>
+
+    <!-- Main Activity -->
+    <string name="finding_location">Buscando tu ubicación...</string>
+    <string name="unable_to_get_location">No se pudo obtener la ubicación</string>
+    <string name="location_error">Error de ubicación</string>
+    <string name="location_permission_needed">Se necesita permiso de ubicación</string>
+    <string name="you_are_at">Estás en: %1$s</string>
+    <string name="photo_added_anonymously">Foto añadida anónimamente</string>
+    <string name="failed_to_load_photo">Error al cargar la foto</string>
+    <string name="please_enter_description">Por favor ingresa una descripción</string>
+    <string name="report_created">Reporte creado</string>
+    <string name="safety_report">Reporte de Seguridad</string>
+    <string name="your_location">Tu Ubicación</string>
+    <string name="camera_permission_needed">Se necesita permiso de cámara para fotos</string>
+    <string name="location_permission_required">Se requiere permiso de ubicación</string>
+
+    <!-- Time Ago -->
+    <string name="just_now">ahora mismo</string>
+    <string name="minutes_ago">%1$dm hace</string>
+    <string name="hours_ago">%1$dh hace</string>
+    <string name="days_ago">%1$dd hace</string>
+    <string name="reported_time">Reportado hace %1$s</string>
+
+    <!-- Photo Selection -->
+    <string name="add_photo">Añadir Foto</string>
+    <string name="take_photo">Tomar Foto</string>
+    <string name="choose_from_gallery">Elegir de Galería</string>
+    <string name="cancel">Cancelar</string>
+
+    <!-- Report Dialog -->
+    <string name="confirm_report_title">¿Crear reporte aquí?</string>
+    <string name="confirm_report_message">Se creará un reporte anónimo en esta ubicación</string>
+    <string name="yes_report">Sí, Reportar</string>
+    <string name="report_input_title">Crear Reporte</string>
+    <string name="report_description_hint">Describe lo que está sucediendo...</string>
+    <string name="submit">Enviar</string>
+    <string name="close">Cerrar</string>
+
+    <!-- Settings -->
+    <string name="settings">Configuración</string>
+    <string name="version">Versión</string>
+    <string name="notifications">Notificaciones</string>
+    <string name="nearby_reports">Reportes cercanos</string>
+    <string name="about">Acerca de</string>
+    <string name="about_description">Aplicación anónima de reportes basada en ubicación para conciencia comunitaria.</string>
+    <string name="privacy">Privacidad</string>
+    <string name="privacy_description">Todos los reportes son anónimos. Los datos de ubicación se anonimizan y las fotos tienen metadatos eliminados.</string>
+
+    <!-- Bottom Menu -->
+    <string name="language_toggle">Español / English</string>
+    <string name="map">Mapa</string>
+    <string name="settings_menu">Configuración</string>
+
+    <!-- Instructions -->
+    <string name="instruction_text">Mantén presionado en el mapa para crear un reporte</string>
+
+    <!-- Content Descriptions -->
+    <string name="back_button">Atrás</string>
+    <string name="location_button">Ubicación</string>
+    <string name="close_status">Cerrar estado</string>
+    <string name="close_instruction">Cerrar instrucción</string>
+</resources>

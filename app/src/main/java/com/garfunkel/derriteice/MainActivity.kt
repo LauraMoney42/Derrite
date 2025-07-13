@@ -3,7 +3,11 @@ package com.garfunkel.derriteice
 import android.Manifest
 import android.animation.ObjectAnimator
 import android.app.AlertDialog
+import android.content.Context
+import android.content.Intent
+import android.content.SharedPreferences
 import android.content.pm.PackageManager
+import android.content.res.Configuration
 import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.Color
@@ -28,12 +32,10 @@ import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import com.google.android.gms.location.FusedLocationProviderClient
 import com.google.android.gms.location.LocationServices
-
 import com.google.android.material.card.MaterialCardView
-
 import com.google.android.material.floatingactionbutton.FloatingActionButton
 import com.google.android.material.textfield.TextInputEditText
-import org.osmdroid.config.Configuration
+import org.osmdroid.config.Configuration as OSMConfiguration
 import org.osmdroid.events.MapEventsReceiver
 import org.osmdroid.tileprovider.tilesource.TileSourceFactory
 import org.osmdroid.util.GeoPoint
@@ -61,14 +63,15 @@ class MainActivity : AppCompatActivity() {
 
     private lateinit var mapView: MapView
     private lateinit var fabLocation: FloatingActionButton
-
     private lateinit var statusCard: MaterialCardView
     private lateinit var statusText: TextView
     private lateinit var statusClose: ImageButton
     private lateinit var instructionOverlay: LinearLayout
-    private lateinit var btnCloseInstruction: ImageButton
+    private lateinit var btnLanguageToggle: Button
+    private lateinit var btnSettings: ImageButton
     private lateinit var fusedLocationClient: FusedLocationProviderClient
     private lateinit var geocoder: Geocoder
+    private lateinit var preferences: SharedPreferences
 
     private var currentLocationMarker: Marker? = null
     private var currentPhoto: Bitmap? = null
@@ -89,7 +92,7 @@ class MainActivity : AppCompatActivity() {
     ) { bitmap ->
         if (bitmap != null) {
             currentPhoto = stripPhotoMetadata(bitmap)
-            showStatusCard("Photo added anonymously", isLoading = false)
+            showStatusCard(getString(R.string.photo_added_anonymously), isLoading = false)
         }
     }
 
@@ -104,12 +107,12 @@ class MainActivity : AppCompatActivity() {
                 inputStream?.close()
                 if (bitmap != null) {
                     currentPhoto = stripPhotoMetadata(bitmap)
-                    showStatusCard("Photo added anonymously", isLoading = false)
+                    showStatusCard(getString(R.string.photo_added_anonymously), isLoading = false)
                 } else {
-                    showStatusCard("Failed to load photo", isError = true)
+                    showStatusCard(getString(R.string.failed_to_load_photo), isError = true)
                 }
             } catch (e: Exception) {
-                showStatusCard("Failed to load photo", isError = true)
+                showStatusCard(getString(R.string.failed_to_load_photo), isError = true)
             }
         }
     }
@@ -117,9 +120,15 @@ class MainActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
+        // Initialize preferences
+        preferences = getSharedPreferences("app_prefs", Context.MODE_PRIVATE)
+
+        // Set app language to Spanish by default (or user's saved preference)
+        setAppLanguage(getSavedLanguage())
+
         // Configure OSMDroid
-        Configuration.getInstance().load(this, getSharedPreferences("osmdroid", 0))
-        Configuration.getInstance().userAgentValue = packageName
+        OSMConfiguration.getInstance().load(this, getSharedPreferences("osmdroid", 0))
+        OSMConfiguration.getInstance().userAgentValue = packageName
 
         setContentView(R.layout.activity_main)
 
@@ -133,12 +142,45 @@ class MainActivity : AppCompatActivity() {
         setupLocationButton()
         setupStatusCard()
         setupInstructionOverlay()
+        setupBottomNavigation()
 
         // Auto-center on user location when app opens
         autoLocateOnStartup()
 
         // Start cleanup timer for expired reports
         startReportCleanupTimer()
+    }
+
+    private fun getSavedLanguage(): String {
+        return preferences.getString("app_language", "es") ?: "es" // Default to Spanish
+    }
+
+    private fun saveLanguage(languageCode: String) {
+        preferences.edit().putString("app_language", languageCode).apply()
+    }
+
+    private fun setAppLanguage(languageCode: String) {
+        val locale = Locale(languageCode)
+        Locale.setDefault(locale)
+
+        val config = Configuration()
+        config.setLocale(locale)
+
+        resources.updateConfiguration(config, resources.displayMetrics)
+    }
+
+    private fun toggleLanguage() {
+        val currentLang = getSavedLanguage()
+        val newLang = if (currentLang == "es") "en" else "es"
+
+        saveLanguage(newLang)
+        setAppLanguage(newLang)
+
+        // Mark that this is a language change recreation
+        preferences.edit().putBoolean("is_language_change", true).apply()
+
+        // Recreate activity to apply language changes
+        recreate()
     }
 
     private fun setupViews() {
@@ -148,6 +190,20 @@ class MainActivity : AppCompatActivity() {
         statusText = findViewById(R.id.status_text)
         statusClose = findViewById(R.id.status_close)
         instructionOverlay = findViewById(R.id.instruction_overlay)
+        btnLanguageToggle = findViewById(R.id.btn_language_toggle)
+        btnSettings = findViewById(R.id.btn_settings)
+    }
+
+    private fun setupBottomNavigation() {
+        btnLanguageToggle.setOnClickListener {
+            animateButtonPress(btnLanguageToggle)
+            toggleLanguage()
+        }
+
+        btnSettings.setOnClickListener {
+            animateButtonPress(btnSettings)
+            // TODO: Open settings activity when ready
+        }
     }
 
     private fun setupMap() {
@@ -169,8 +225,19 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun autoLocateOnStartup() {
+        // Check if this is a recreation due to language change
+        val isLanguageChange = preferences.getBoolean("is_language_change", false)
+        if (isLanguageChange) {
+            // Clear the flag and skip location popup
+            preferences.edit().putBoolean("is_language_change", false).apply()
+            if (hasLocationPermission()) {
+                getCurrentLocationSilently(isStartup = true)
+            }
+            return
+        }
+
         if (hasLocationPermission()) {
-            showStatusCard("Finding your location...", isLoading = true)
+            showStatusCard(getString(R.string.finding_location), isLoading = true)
             getCurrentLocationSilently(isStartup = true)
         } else {
             // If no permission, just keep the default map location
@@ -202,19 +269,19 @@ class MainActivity : AppCompatActivity() {
                     if (isStartup) {
                         hideStatusCard()
                     } else {
-                        showStatusCard("Unable to get location", isError = true)
+                        showStatusCard(getString(R.string.unable_to_get_location), isError = true)
                     }
                 }
             }.addOnFailureListener {
                 if (isStartup) {
                     hideStatusCard()
                 } else {
-                    showStatusCard("Location error", isError = true)
+                    showStatusCard(getString(R.string.location_error), isError = true)
                 }
             }
         } catch (e: SecurityException) {
             if (!isStartup) {
-                showStatusCard("Location permission needed", isError = true)
+                showStatusCard(getString(R.string.location_permission_needed), isError = true)
             }
         }
     }
@@ -253,16 +320,16 @@ class MainActivity : AppCompatActivity() {
                     }
                 }
 
-                showStatusCard("You are at: $locationText", isLoading = false)
+                showStatusCard(getString(R.string.you_are_at, locationText), isLoading = false)
             } else {
                 // Fallback to coordinates if geocoding fails
                 val coords = "${String.format("%.4f", location.latitude)}, ${String.format("%.4f", location.longitude)}"
-                showStatusCard("You are at: $coords", isLoading = false)
+                showStatusCard(getString(R.string.you_are_at, coords), isLoading = false)
             }
         } catch (e: IOException) {
             // Geocoding failed, show coordinates
             val coords = "${String.format("%.4f", location.latitude)}, ${String.format("%.4f", location.longitude)}"
-            showStatusCard("You are at: $coords", isLoading = false)
+            showStatusCard(getString(R.string.you_are_at, coords), isLoading = false)
         }
 
         // Auto-hide status after 5 seconds
@@ -296,8 +363,6 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-
-
     private fun setupStatusCard() {
         statusClose.setOnClickListener {
             hideStatusCard()
@@ -312,8 +377,6 @@ class MainActivity : AppCompatActivity() {
             }
         }, 10000)
     }
-
-
 
     private fun showReportConfirmDialog(location: GeoPoint) {
         val dialogView = layoutInflater.inflate(R.layout.dialog_confirm_report, null)
@@ -364,7 +427,7 @@ class MainActivity : AppCompatActivity() {
         btnSubmit.setOnClickListener {
             val reportText = editReportText.text?.toString()?.trim()
             if (reportText.isNullOrEmpty()) {
-                showStatusCard("Please enter a description", isError = true)
+                showStatusCard(getString(R.string.please_enter_description), isError = true)
                 return@setOnClickListener
             }
 
@@ -375,8 +438,6 @@ class MainActivity : AppCompatActivity() {
 
         dialog.show()
     }
-
-
 
     private fun createReport(location: GeoPoint, text: String, photo: Bitmap?) {
         val report = Report(
@@ -392,7 +453,7 @@ class MainActivity : AppCompatActivity() {
         activeReports.add(report)
         addReportToMap(report)
 
-        showStatusCard("Report created", isLoading = false)
+        showStatusCard(getString(R.string.report_created), isLoading = false)
 
         // Auto-hide status after 3 seconds
         Handler(Looper.getMainLooper()).postDelayed({
@@ -411,7 +472,7 @@ class MainActivity : AppCompatActivity() {
             position = report.location
             setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_BOTTOM)
             icon = ContextCompat.getDrawable(this@MainActivity, R.drawable.ic_report_marker)
-            title = "Safety Report"
+            title = getString(R.string.safety_report)
 
             // Handle marker tap to show report details
             setOnMarkerClickListener { _, _ ->
@@ -470,7 +531,7 @@ class MainActivity : AppCompatActivity() {
 
         // Set report content
         textReportContent.text = report.text
-        textReportTime.text = "Reported ${getTimeAgo(report.timestamp)}"
+        textReportTime.text = getString(R.string.reported_time, getTimeAgo(report.timestamp))
 
         // Show photo if available
         if (report.hasPhoto && report.photo != null) {
@@ -532,26 +593,27 @@ class MainActivity : AppCompatActivity() {
         val diff = now - timestamp
         val minutes = diff / (1000 * 60)
         val hours = minutes / 60
+        val days = hours / 24
 
         return when {
-            minutes < 1 -> "just now"
-            minutes < 60 -> "${minutes}m ago"
-            hours < 24 -> "${hours}h ago"
-            else -> "${hours / 24}d ago"
+            minutes < 1 -> getString(R.string.just_now)
+            minutes < 60 -> getString(R.string.minutes_ago, minutes)
+            hours < 24 -> getString(R.string.hours_ago, hours)
+            else -> getString(R.string.days_ago, days)
         }
     }
 
     private fun showPhotoSelectionDialog() {
-        val options = arrayOf("Take Photo", "Choose from Gallery")
+        val options = arrayOf(getString(R.string.take_photo), getString(R.string.choose_from_gallery))
         AlertDialog.Builder(this)
-            .setTitle("Add Photo")
+            .setTitle(getString(R.string.add_photo))
             .setItems(options) { _, which ->
                 when (which) {
                     0 -> requestCameraPermissionAndCapture()
                     1 -> photoPickerLauncher.launch("image/*")
                 }
             }
-            .setNegativeButton("Cancel", null)
+            .setNegativeButton(getString(R.string.cancel), null)
             .show()
     }
 
@@ -602,7 +664,7 @@ class MainActivity : AppCompatActivity() {
             return
         }
 
-        showStatusCard("Finding your location...", isLoading = true)
+        showStatusCard(getString(R.string.finding_location), isLoading = true)
         getCurrentLocationSilently(isStartup = false)
     }
 
@@ -615,7 +677,7 @@ class MainActivity : AppCompatActivity() {
             position = location
             setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_BOTTOM)
             icon = ContextCompat.getDrawable(this@MainActivity, R.drawable.ic_location_pin)
-            title = "Your Location"
+            title = getString(R.string.your_location)
 
             alpha = 0f
             ObjectAnimator.ofFloat(this, "alpha", 0f, 1f).apply {
@@ -694,7 +756,7 @@ class MainActivity : AppCompatActivity() {
                 LOCATION_PERMISSION_REQUEST
             )
         } else {
-            showStatusCard("Location permission needed", isError = true)
+            showStatusCard(getString(R.string.location_permission_needed), isError = true)
         }
     }
 
@@ -710,14 +772,14 @@ class MainActivity : AppCompatActivity() {
                 if (grantResults.isNotEmpty() && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
                     getCurrentLocation()
                 } else {
-                    showStatusCard("Location permission is required", isError = true)
+                    showStatusCard(getString(R.string.location_permission_required), isError = true)
                 }
             }
             CAMERA_PERMISSION_REQUEST -> {
                 if (grantResults.isNotEmpty() && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
                     cameraLauncher.launch(null)
                 } else {
-                    showStatusCard("Camera permission needed for photos", isError = true)
+                    showStatusCard(getString(R.string.camera_permission_needed), isError = true)
                 }
             }
         }

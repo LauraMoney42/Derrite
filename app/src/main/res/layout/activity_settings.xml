@@ -24,13 +24,13 @@
                 android:layout_height="24dp"
                 android:background="?attr/selectableItemBackgroundBorderless"
                 android:src="@android:drawable/ic_menu_revert"
-                android:contentDescription="Back" />
+                android:contentDescription="@string/back_button" />
 
             <TextView
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
-                android:text="Settings"
+                android:text="@string/settings"
                 android:textSize="20sp"
                 android:textStyle="bold"
                 android:gravity="center" />
@@ -58,7 +58,7 @@
                 <TextView
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:text="Version"
+                    android:text="@string/version"
                     android:textStyle="bold"
                     android:textSize="16sp"
                     android:layout_marginBottom="8dp" />
@@ -91,7 +91,7 @@
                 <TextView
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:text="Notifications"
+                    android:text="@string/notifications"
                     android:textStyle="bold"
                     android:textSize="16sp"
                     android:layout_marginBottom="8dp" />
@@ -105,7 +105,7 @@
                         android:layout_width="0dp"
                         android:layout_height="wrap_content"
                         android:layout_weight="1"
-                        android:text="Nearby reports"
+                        android:text="@string/nearby_reports"
                         android:textSize="14sp" />
 
                     <com.google.android.material.materialswitch.MaterialSwitch
@@ -137,7 +137,7 @@
                 <TextView
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:text="About"
+                    android:text="@string/about"
                     android:textStyle="bold"
                     android:textSize="16sp"
                     android:layout_marginBottom="8dp" />
@@ -145,7 +145,7 @@
                 <TextView
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:text="Anonymous location-based reporting app for community awareness."
+                    android:text="@string/about_description"
                     android:textSize="14sp"
                     android:textColor="@color/text_secondary" />
 
@@ -170,7 +170,7 @@
                 <TextView
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:text="Privacy"
+                    android:text="@string/privacy"
                     android:textStyle="bold"
                     android:textSize="16sp"
                     android:layout_marginBottom="8dp" />
@@ -178,7 +178,7 @@
                 <TextView
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:text="All reports are anonymous. Location data is anonymized and photos have metadata stripped."
+                    android:text="@string/privacy_description"
                     android:textSize="14sp"
                     android:textColor="@color/text_secondary" />
 
