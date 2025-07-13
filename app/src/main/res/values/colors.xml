@@ -1,9 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <!-- Neutral Theme Colors (No Red Primary) -->
-    <color name="primary">#000000</color>
-    <color name="primary_dark">#000000</color>
-    <color name="accent">#000000</color>
+    <!-- Black, White, Red Color Scheme (Your Original Colors) -->
+    <color name="primary">#FF0000</color>
+    <color name="primary_dark">#CC0000</color>
+    <color name="accent">#FF0000</color>
     <color name="surface">#FFFFFF</color>
     <color name="surface_variant">#F5F5F5</color>
     <color name="background">#FFFFFF</color>
@@ -15,16 +15,16 @@
     <color name="divider">#CCCCCC</color>
     <color name="fab_background">#000000</color>
 
-    <!-- Additional colors for consistent theming -->
-    <color name="button_primary">#000000</color>
+    <!-- Additional colors for consistent theming (Your Original Colors) -->
+    <color name="button_primary">#FF0000</color>
     <color name="button_secondary">#000000</color>
     <color name="border_color">#000000</color>
-
-    <!-- Basic colors -->
+    <color name="report_red">#FF0000</color>
+    <color name="alert_red">#FF0000</color>
     <color name="white">#FFFFFF</color>
     <color name="black">#000000</color>
 
-    <!-- UI Component Colors -->
+    <!-- New Search UI Colors -->
     <color name="text_hint">#999999</color>
     <color name="icon_primary">#000000</color>
     <color name="icon_secondary">#666666</color>
@@ -35,9 +35,4 @@
     <color name="search_background">#FFFFFF</color>
     <color name="search_hint">#999999</color>
     <color name="transparent">#00000000</color>
-
-    <!-- RED ONLY FOR REPORTS -->
-    <color name="report_red">#FF0000</color>
-    <color name="report_button_background">#FF0000</color>
-    <color name="report_marker_color">#FF0000</color>
 </resources>

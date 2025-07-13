@@ -4,7 +4,7 @@
     <string name="app_name">Derrite ICE</string>
 
     <!-- Navigation -->
-    <string name="language_toggle">English</string>
+    <string name="language_toggle">Español</string>
     <string name="settings">Settings</string>
 
     <!-- Location -->
@@ -64,6 +64,31 @@
     <string name="privacy_description">Your privacy is protected with anonymous reporting</string>
 
     <string name="back_button">Back</string>
+
+
+        <!-- Alert System -->
+        <string name="alerts">Alerts</string>
+        <string name="alerts_in_your_area">Alerts in Your Area</string>
+        <string name="alerts_for_area">Alerts for %1$s</string>
+        <string name="alerts_for_your_area">Alerts for Your Area</string>
+        <string name="your_area">Your Area</string>
+        <string name="checking_your_area">Checking your area…</string>
+        <string name="checking_for_alerts">Checking for alerts…</string>
+        <string name="no_alerts_in_area">All Clear!</string>
+        <string name="no_alerts_description">No safety reports in your area right now.</string>
+        <string name="new_alerts_found">%1$d new alerts in your area</string>
+        <string name="new_alerts_available">New alerts in your area</string>
+        <string name="location_needed_for_alerts">Location needed to check for alerts</string>
+
+        <!-- Alert Item -->
+        <string name="has_photo">Photo attached</string>
+        <string name="view_on_map">View on Map</string>
+        <string name="view_details">View Details</string>
+        <string name="refresh">Refresh</string>
+        <string name="mark_all_read">Mark All Read</string>
+
+    <string name="distance_feet">%1$d ft away</string>
+    <string name="distance_miles">%1$s mi away</string>
 
     <!-- Instructions -->
     <string name="instruction_title">Anonymous Safety Reporting</string>

@@ -22,7 +22,7 @@
         android:layout_toStartOf="@+id/fab_location"
         app:cardCornerRadius="24dp"
         app:cardElevation="8dp"
-        app:cardBackgroundColor="@color/surface">
+        app:cardBackgroundColor="@android:color/white">
 
         <LinearLayout
             android:layout_width="match_parent"
@@ -102,7 +102,7 @@
         android:visibility="gone"
         app:cardCornerRadius="12dp"
         app:cardElevation="6dp"
-        app:cardBackgroundColor="@color/surface">
+        app:cardBackgroundColor="@android:color/white">
 
         <LinearLayout
             android:layout_width="match_parent"
@@ -199,9 +199,20 @@
             android:id="@+id/btn_settings"
             android:layout_width="48dp"
             android:layout_height="48dp"
+            android:layout_marginEnd="8dp"
             android:background="?attr/selectableItemBackgroundBorderless"
             android:src="@drawable/ic_settings"
             android:contentDescription="@string/settings"
+            app:tint="@color/bottom_nav_icon" />
+
+        <!-- Alerts Button -->
+        <ImageButton
+            android:id="@+id/btn_alerts"
+            android:layout_width="48dp"
+            android:layout_height="48dp"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:src="@drawable/ic_notifications"
+            android:contentDescription="@string/alerts"
             app:tint="@color/bottom_nav_icon" />
 
     </LinearLayout>

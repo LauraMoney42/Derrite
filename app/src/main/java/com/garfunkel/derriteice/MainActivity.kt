@@ -19,12 +19,14 @@ import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
 import android.text.TextWatcher
+import android.view.LayoutInflater
 import android.view.View
 import android.view.animation.DecelerateInterpolator
 import android.widget.Button
 import android.widget.ImageButton
 import android.widget.ImageView
 import android.widget.LinearLayout
+import android.widget.ProgressBar
 import android.widget.TextView
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
@@ -47,8 +49,7 @@ import org.osmdroid.views.overlay.Polygon
 import java.io.IOException
 import java.util.Locale
 import java.util.UUID
-import kotlin.math.cos
-import kotlin.math.sin
+import kotlin.math.*
 
 data class Report(
     val id: String,
@@ -58,6 +59,14 @@ data class Report(
     val photo: Bitmap?,
     val timestamp: Long,
     val expiresAt: Long
+)
+
+data class Alert(
+    val id: String,
+    val report: Report,
+    val distanceFromUser: Double, // in meters
+    val isViewed: Boolean = false,
+    val timestamp: Long = System.currentTimeMillis()
 )
 
 class MainActivity : AppCompatActivity() {
@@ -70,6 +79,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var instructionOverlay: LinearLayout
     private lateinit var btnLanguageToggle: Button
     private lateinit var btnSettings: ImageButton
+    private lateinit var btnAlerts: ImageButton
     private lateinit var searchBar: TextInputEditText
     private lateinit var btnSearch: ImageButton
     private lateinit var btnClearSearch: ImageButton
@@ -84,12 +94,17 @@ class MainActivity : AppCompatActivity() {
     private val activeReports = mutableListOf<Report>()
     private val reportMarkers = mutableListOf<Marker>()
     private val reportCircles = mutableListOf<Polygon>()
+    private val activeAlerts = mutableListOf<Alert>()
+    private val viewedAlertIds = mutableSetOf<String>()
     private var hasInitialLocationSet = false
+    private var currentAlertsDialog: AlertDialog? = null
 
     private val LOCATION_PERMISSION_REQUEST = 1001
     private val CAMERA_PERMISSION_REQUEST = 1002
     private val REPORT_RADIUS_METERS = 804.5 // 0.5 miles (hyper-local coverage)
     private val REPORT_DURATION_HOURS = 8L
+    private val ALERT_RADIUS_METERS = 1609.0 // 1 mile for alerts
+    private val ZIP_CODE_RADIUS_METERS = 8047.0 // ~5 miles (approximate zip code area)
 
     // Camera launcher for photo capture
     private val cameraLauncher = registerForActivityResult(
@@ -128,6 +143,9 @@ class MainActivity : AppCompatActivity() {
         // Initialize preferences
         preferences = getSharedPreferences("app_prefs", Context.MODE_PRIVATE)
 
+        // Load viewed alerts from preferences
+        loadViewedAlerts()
+
         // Set app language to Spanish by default (or user's saved preference)
         setAppLanguage(getSavedLanguage())
 
@@ -155,10 +173,331 @@ class MainActivity : AppCompatActivity() {
 
         // Start cleanup timer for expired reports
         startReportCleanupTimer()
+
+        // Start periodic alert checking
+        startAlertChecker()
     }
 
+    // Alert System Implementation
+    private fun loadViewedAlerts() {
+        val viewedSet = preferences.getStringSet("viewed_alerts", emptySet()) ?: emptySet()
+        viewedAlertIds.clear()
+        viewedAlertIds.addAll(viewedSet)
+    }
+
+    private fun saveViewedAlerts() {
+        preferences.edit().putStringSet("viewed_alerts", viewedAlertIds).apply()
+    }
+
+    private fun calculateDistance(lat1: Double, lng1: Double, lat2: Double, lng2: Double): Double {
+        val earthRadius = 6371000.0 // Earth radius in meters
+        val dLat = Math.toRadians(lat2 - lat1)
+        val dLng = Math.toRadians(lng2 - lng1)
+        val a = sin(dLat / 2) * sin(dLat / 2) +
+                cos(Math.toRadians(lat1)) * cos(Math.toRadians(lat2)) *
+                sin(dLng / 2) * sin(dLng / 2)
+        val c = 2 * atan2(sqrt(a), sqrt(1 - a))
+        return earthRadius * c
+    }
+
+    private fun checkForNewAlerts() {
+        currentLocation?.let { location ->
+            val newAlerts = mutableListOf<Alert>()
+
+            // Check all active reports for proximity to user
+            for (report in activeReports) {
+                val distance = calculateDistance(
+                    location.latitude, location.longitude,
+                    report.location.latitude, report.location.longitude
+                )
+
+                // If report is within alert radius (and not the user's own report based on timing)
+                if (distance <= ZIP_CODE_RADIUS_METERS) {
+                    val existingAlert = activeAlerts.find { it.report.id == report.id }
+                    if (existingAlert == null) {
+                        val alert = Alert(
+                            id = UUID.randomUUID().toString(),
+                            report = report,
+                            distanceFromUser = distance,
+                            isViewed = viewedAlertIds.contains(report.id)
+                        )
+                        newAlerts.add(alert)
+                        activeAlerts.add(alert)
+                    }
+                }
+            }
+
+            // Update alerts button if there are unviewed alerts
+            val hasUnviewed = activeAlerts.any { !it.isViewed && !viewedAlertIds.contains(it.report.id) }
+            updateAlertsButtonColor(hasUnviewed)
+
+            // Show brief notification if new alerts were found
+            if (newAlerts.isNotEmpty()) {
+                val unviewedNewAlerts = newAlerts.filter { !it.isViewed && !viewedAlertIds.contains(it.report.id) }
+                if (unviewedNewAlerts.isNotEmpty()) {
+                    showStatusCard(getString(R.string.new_alerts_found, unviewedNewAlerts.size), isLoading = false)
+                    Handler(Looper.getMainLooper()).postDelayed({
+                        hideStatusCard()
+                    }, 3000)
+                }
+            }
+        }
+    }
+
+    private fun startAlertChecker() {
+        val alertCheckRunnable = object : Runnable {
+            override fun run() {
+                checkForNewAlerts()
+                // Check for alerts every 2 minutes
+                Handler(Looper.getMainLooper()).postDelayed(this, 2 * 60 * 1000)
+            }
+        }
+
+        // Start alert checking after 10 seconds
+        Handler(Looper.getMainLooper()).postDelayed(alertCheckRunnable, 10000)
+    }
+
+    private fun openAlertsScreen() {
+        currentLocation?.let { location ->
+            showAlertsDialog(location)
+        } ?: run {
+            showStatusCard(getString(R.string.location_needed_for_alerts), isError = true)
+        }
+    }
+
+    private fun showAlertsDialog(userLocation: Location) {
+        val dialogView = LayoutInflater.from(this).inflate(R.layout.dialog_alerts, null)
+        currentAlertsDialog = AlertDialog.Builder(this)
+            .setView(dialogView)
+            .setCancelable(true)
+            .create()
+
+        val btnCloseAlerts = dialogView.findViewById<ImageButton>(R.id.btn_close_alerts)
+        val textAlertLocation = dialogView.findViewById<TextView>(R.id.text_alert_location)
+        val alertsContainer = dialogView.findViewById<LinearLayout>(R.id.alerts_container)
+        val noAlertsContainer = dialogView.findViewById<LinearLayout>(R.id.no_alerts_container)
+        val loadingContainer = dialogView.findViewById<LinearLayout>(R.id.loading_container)
+        val btnRefreshAlerts = dialogView.findViewById<Button>(R.id.btn_refresh_alerts)
+        val btnMarkAllRead = dialogView.findViewById<Button>(R.id.btn_mark_all_read)
+
+        // Show loading initially
+        loadingContainer.visibility = View.VISIBLE
+        noAlertsContainer.visibility = View.GONE
+
+        // Initially hide Mark All Read button until we know if there are alerts
+        btnMarkAllRead.visibility = View.GONE
+
+        // Get user's current area description
+        updateLocationDescription(userLocation, textAlertLocation)
+
+        btnCloseAlerts.setOnClickListener {
+            currentAlertsDialog?.dismiss()
+        }
+
+        btnRefreshAlerts.setOnClickListener {
+            refreshAlerts(alertsContainer, noAlertsContainer, loadingContainer, userLocation)
+        }
+
+        btnMarkAllRead.setOnClickListener {
+            markAllAlertsAsRead()
+            loadAlertsIntoDialog(alertsContainer, noAlertsContainer, loadingContainer, userLocation)
+        }
+
+        // Load alerts after a short delay to show loading state
+        Handler(Looper.getMainLooper()).postDelayed({
+            loadAlertsIntoDialog(alertsContainer, noAlertsContainer, loadingContainer, userLocation)
+        }, 1000)
+
+        currentAlertsDialog?.show()
+    }
+
+    private fun updateLocationDescription(location: Location, textView: TextView) {
+        try {
+            val addresses: List<Address>? = geocoder.getFromLocation(location.latitude, location.longitude, 1)
+            if (!addresses.isNullOrEmpty()) {
+                val address = addresses[0]
+                val locationText = buildString {
+                    if (!address.locality.isNullOrEmpty()) {
+                        append(address.locality)
+                    }
+                    if (!address.adminArea.isNullOrEmpty()) {
+                        if (isNotEmpty()) append(", ")
+                        append(address.adminArea)
+                    }
+                    if (!address.postalCode.isNullOrEmpty()) {
+                        if (isNotEmpty()) append(" ")
+                        append(address.postalCode)
+                    }
+                }
+                textView.text = getString(R.string.alerts_for_area, locationText.ifEmpty { getString(R.string.your_area) })
+            } else {
+                textView.text = getString(R.string.alerts_for_your_area)
+            }
+        } catch (e: IOException) {
+            textView.text = getString(R.string.alerts_for_your_area)
+        }
+    }
+
+    private fun refreshAlerts(alertsContainer: LinearLayout, noAlertsContainer: LinearLayout,
+                              loadingContainer: LinearLayout, userLocation: Location) {
+        loadingContainer.visibility = View.VISIBLE
+        noAlertsContainer.visibility = View.GONE
+        alertsContainer.removeAllViews()
+
+        // Hide Mark All Read button during loading
+        currentAlertsDialog?.let { dialog ->
+            val btnMarkAllRead = dialog.findViewById<Button>(R.id.btn_mark_all_read)
+            btnMarkAllRead?.visibility = View.GONE
+        }
+
+        checkForNewAlerts()
+
+        Handler(Looper.getMainLooper()).postDelayed({
+            loadAlertsIntoDialog(alertsContainer, noAlertsContainer, loadingContainer, userLocation)
+        }, 1000)
+    }
+
+    private fun loadAlertsIntoDialog(alertsContainer: LinearLayout, noAlertsContainer: LinearLayout,
+                                     loadingContainer: LinearLayout, userLocation: Location) {
+        alertsContainer.removeAllViews()
+
+        // Filter alerts within ZIP code area, not viewed, and sort by distance
+        val nearbyUnviewedAlerts = activeAlerts
+            .filter { it.distanceFromUser <= ZIP_CODE_RADIUS_METERS }
+            .filter { !viewedAlertIds.contains(it.report.id) }
+            .sortedBy { it.distanceFromUser }
+
+        loadingContainer.visibility = View.GONE
+
+        // Get the dialog buttons
+        currentAlertsDialog?.let { dialog ->
+            val btnMarkAllRead = dialog.findViewById<Button>(R.id.btn_mark_all_read)
+
+            if (nearbyUnviewedAlerts.isEmpty()) {
+                noAlertsContainer.visibility = View.VISIBLE
+                btnMarkAllRead?.visibility = View.GONE  // Hide button when no alerts
+            } else {
+                noAlertsContainer.visibility = View.GONE
+                btnMarkAllRead?.visibility = View.VISIBLE  // Show button when alerts exist
+
+                for (alert in nearbyUnviewedAlerts) {
+                    val alertItemView = createAlertItemView(alert)
+                    alertsContainer.addView(alertItemView)
+                }
+            }
+        }
+    }
+
+    private fun createAlertItemView(alert: Alert): View {
+        val alertView = LayoutInflater.from(this).inflate(R.layout.item_alert, null)
+
+        val alertIcon = alertView.findViewById<ImageView>(R.id.alert_icon)
+        val textAlertDistance = alertView.findViewById<TextView>(R.id.text_alert_distance)
+        val textAlertTime = alertView.findViewById<TextView>(R.id.text_alert_time)
+        val newAlertBadge = alertView.findViewById<View>(R.id.new_alert_badge)
+        val textAlertContent = alertView.findViewById<TextView>(R.id.text_alert_content)
+        val photoIndicator = alertView.findViewById<LinearLayout>(R.id.photo_indicator)
+        val btnViewOnMap = alertView.findViewById<Button>(R.id.btn_view_on_map)
+        val btnViewDetails = alertView.findViewById<Button>(R.id.btn_view_details)
+
+        // Set content
+        textAlertDistance.text = formatDistance(alert.distanceFromUser)
+        textAlertTime.text = getTimeAgo(alert.report.timestamp)
+        textAlertContent.text = alert.report.text
+
+        // Show photo indicator if report has photo
+        photoIndicator.visibility = if (alert.report.hasPhoto) View.VISIBLE else View.GONE
+
+        // Always show new badge since we're only showing unviewed alerts
+        newAlertBadge.visibility = View.VISIBLE
+
+        // Button actions
+        btnViewOnMap.setOnClickListener {
+            currentAlertsDialog?.dismiss()
+            showReportOnMap(alert.report)
+            markAlertAsViewed(alert.report.id)
+        }
+
+        btnViewDetails.setOnClickListener {
+            showReportViewDialog(alert.report)
+            markAlertAsViewed(alert.report.id)
+        }
+
+        return alertView
+    }
+
+    private fun formatDistance(distanceInMeters: Double): String {
+        val distanceInFeet = distanceInMeters * 3.28084
+        val distanceInMiles = distanceInMeters / 1609.0
+
+        return when {
+            distanceInMeters < 1609 -> "${distanceInFeet.roundToInt()} ft away"
+            else -> "${distanceInMiles.format(1)} mi away"
+        }
+    }
+
+    private fun Double.format(digits: Int) = "%.${digits}f".format(this)
+
+    private fun showReportOnMap(report: Report) {
+        mapView.controller.animateTo(report.location, 18.0, 1000L)
+
+        // Find and highlight the report marker
+        val reportMarker = reportMarkers.find { marker ->
+            marker.position.latitude == report.location.latitude &&
+                    marker.position.longitude == report.location.longitude
+        }
+
+        reportMarker?.let { marker ->
+            // Show info bubble for the marker
+            marker.showInfoWindow()
+
+            // Optional: Add a pulse animation to draw attention
+            ObjectAnimator.ofFloat(marker, "alpha", 1f, 0.5f, 1f).apply {
+                duration = 1000
+                repeatCount = 2
+                start()
+            }
+        }
+    }
+
+    private fun markAlertAsViewed(reportId: String) {
+        viewedAlertIds.add(reportId)
+        saveViewedAlerts()
+
+        // Update alerts button color
+        val hasUnviewed = activeAlerts.any { !viewedAlertIds.contains(it.report.id) }
+        updateAlertsButtonColor(hasUnviewed)
+
+        // Refresh the alerts dialog if it's currently open
+        currentAlertsDialog?.let { dialog ->
+            if (dialog.isShowing) {
+                currentLocation?.let { location ->
+                    val dialogView = dialog.findViewById<View>(android.R.id.content)
+                    dialogView?.let { view ->
+                        val alertsContainer = view.findViewById<LinearLayout>(R.id.alerts_container)
+                        val noAlertsContainer = view.findViewById<LinearLayout>(R.id.no_alerts_container)
+                        val loadingContainer = view.findViewById<LinearLayout>(R.id.loading_container)
+
+                        if (alertsContainer != null && noAlertsContainer != null && loadingContainer != null) {
+                            loadAlertsIntoDialog(alertsContainer, noAlertsContainer, loadingContainer, location)
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    private fun markAllAlertsAsRead() {
+        for (alert in activeAlerts) {
+            viewedAlertIds.add(alert.report.id)
+        }
+        saveViewedAlerts()
+        updateAlertsButtonColor(false)
+    }
+
+    // Rest of the existing code...
     private fun getSavedLanguage(): String {
-        return preferences.getString("app_language", "es") ?: "es" // Default to Spanish
+        return preferences.getString("app_language", "es") ?: "es" // Default to Spanish on first run
     }
 
     private fun saveLanguage(languageCode: String) {
@@ -198,6 +537,7 @@ class MainActivity : AppCompatActivity() {
         instructionOverlay = findViewById(R.id.instruction_overlay)
         btnLanguageToggle = findViewById(R.id.btn_language_toggle)
         btnSettings = findViewById(R.id.btn_settings)
+        btnAlerts = findViewById(R.id.btn_alerts)
         searchBar = findViewById(R.id.search_bar)
         btnSearch = findViewById(R.id.btn_search)
         btnClearSearch = findViewById(R.id.btn_clear_search)
@@ -213,6 +553,24 @@ class MainActivity : AppCompatActivity() {
             animateButtonPress(btnSettings)
             // TODO: Open settings activity when ready
         }
+
+        btnAlerts.setOnClickListener {
+            animateButtonPress(btnAlerts)
+            openAlertsScreen()
+        }
+
+        // Initialize alerts button color
+        updateAlertsButtonColor(false)
+    }
+
+    private fun updateAlertsButtonColor(hasUnviewedAlerts: Boolean = false) {
+        val tintColor = if (hasUnviewedAlerts) {
+            ContextCompat.getColor(this, android.R.color.holo_red_light)
+        } else {
+            ContextCompat.getColor(this, R.color.bottom_nav_icon)
+        }
+
+        btnAlerts.imageTintList = android.content.res.ColorStateList.valueOf(tintColor)
     }
 
     private fun setupSearchBar() {
@@ -417,11 +775,17 @@ class MainActivity : AppCompatActivity() {
                         addLocationMarker(userLocation) // Add blue marker immediately on startup
                         hasInitialLocationSet = true
                         hideStatusCard()
+
+                        // Check for alerts once we have location
+                        checkForNewAlerts()
                     } else {
                         // Manual location button press - animate and show address
                         mapView.controller.animateTo(userLocation, 18.0, 1000L)
                         addLocationMarker(userLocation)
                         showLocationAddress(location)
+
+                        // Check for alerts when location updates
+                        checkForNewAlerts()
                     }
                 } else {
                     if (isStartup) {
@@ -617,6 +981,11 @@ class MainActivity : AppCompatActivity() {
         Handler(Looper.getMainLooper()).postDelayed({
             hideStatusCard()
         }, 3000)
+
+        // Check for new alerts after creating a report (for other users' areas)
+        Handler(Looper.getMainLooper()).postDelayed({
+            checkForNewAlerts()
+        }, 5000)
     }
 
     private fun addReportToMap(report: Report) {
@@ -715,7 +1084,14 @@ class MainActivity : AppCompatActivity() {
                 expiredReports.forEach { report ->
                     removeReportFromMap(report)
                     activeReports.remove(report)
+
+                    // Also remove from alerts
+                    activeAlerts.removeAll { it.report.id == report.id }
                 }
+
+                // Update alerts button after cleanup
+                val hasUnviewed = activeAlerts.any { !viewedAlertIds.contains(it.report.id) }
+                updateAlertsButtonColor(hasUnviewed)
 
                 // Schedule next cleanup in 1 hour
                 Handler(Looper.getMainLooper()).postDelayed(this, 60 * 60 * 1000)
@@ -956,5 +1332,6 @@ class MainActivity : AppCompatActivity() {
     override fun onDestroy() {
         super.onDestroy()
         mapView.onDetach()
+        currentAlertsDialog?.dismiss()
     }
 }

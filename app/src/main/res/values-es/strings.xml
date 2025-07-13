@@ -4,7 +4,7 @@
     <string name="app_name">Derrite ICE</string>
 
     <!-- Navigation -->
-    <string name="language_toggle">Español</string>
+    <string name="language_toggle">English</string>
     <string name="settings">Configuración</string>
 
     <!-- Location -->
@@ -15,7 +15,8 @@
     <string name="location_error">Error de ubicación</string>
     <string name="location_permission_needed">Se necesita permiso de ubicación</string>
     <string name="location_permission_required">Se requiere permiso de ubicación</string>
-
+    <string name="distance_feet">A %1$d pies</string>
+    <string name="distance_miles">A %1$s millas</string>
     <!-- Search -->
     <string name="search">Buscar</string>
     <string name="search_address">Buscar dirección o lugar...</string>
@@ -64,6 +65,28 @@
     <string name="privacy_description">Tu privacidad está protegida con reportes anónimos</string>
 
     <string name="back_button">Atrás</string>
+
+    <!-- Additional strings for res/values-es/strings.xml (Spanish) -->
+    <!-- Alert System -->
+    <string name="alerts">Alertas</string>
+    <string name="alerts_in_your_area">Alertas en Tu Área</string>
+    <string name="alerts_for_area">Alertas para %1$s</string>
+    <string name="alerts_for_your_area">Alertas para Tu Área</string>
+    <string name="your_area">Tu Área</string>
+    <string name="checking_your_area">Verificando tu área…</string>
+    <string name="checking_for_alerts">Buscando alertas…</string>
+    <string name="no_alerts_in_area">¡Todo Despejado!</string>
+    <string name="no_alerts_description">No hay reportes de seguridad en tu área ahora mismo.</string>
+    <string name="new_alerts_found">%1$d nuevas alertas en tu área</string>
+    <string name="new_alerts_available">Nuevas alertas en tu área</string>
+    <string name="location_needed_for_alerts">Se necesita ubicación para verificar alertas</string>
+
+    <!-- Alert Item -->
+    <string name="has_photo">Foto adjunta</string>
+    <string name="view_on_map">Ver en Mapa</string>
+    <string name="view_details">Ver Detalles</string>
+    <string name="refresh">Actualizar</string>
+    <string name="mark_all_read">Marcar Todas como Leídas</string>
 
     <!-- Instructions -->
     <string name="instruction_title">Reportes Anónimos de Seguridad</string>
