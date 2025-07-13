@@ -18,6 +18,7 @@ import android.os.Build
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
+import android.text.TextWatcher
 import android.view.View
 import android.view.animation.DecelerateInterpolator
 import android.widget.Button
@@ -69,11 +70,15 @@ class MainActivity : AppCompatActivity() {
     private lateinit var instructionOverlay: LinearLayout
     private lateinit var btnLanguageToggle: Button
     private lateinit var btnSettings: ImageButton
+    private lateinit var searchBar: TextInputEditText
+    private lateinit var btnSearch: ImageButton
+    private lateinit var btnClearSearch: ImageButton
     private lateinit var fusedLocationClient: FusedLocationProviderClient
     private lateinit var geocoder: Geocoder
     private lateinit var preferences: SharedPreferences
 
     private var currentLocationMarker: Marker? = null
+    private var currentSearchMarker: Marker? = null
     private var currentPhoto: Bitmap? = null
     private var currentLocation: Location? = null
     private val activeReports = mutableListOf<Report>()
@@ -143,6 +148,7 @@ class MainActivity : AppCompatActivity() {
         setupStatusCard()
         setupInstructionOverlay()
         setupBottomNavigation()
+        setupSearchBar()
 
         // Auto-center on user location when app opens
         autoLocateOnStartup()
@@ -192,6 +198,9 @@ class MainActivity : AppCompatActivity() {
         instructionOverlay = findViewById(R.id.instruction_overlay)
         btnLanguageToggle = findViewById(R.id.btn_language_toggle)
         btnSettings = findViewById(R.id.btn_settings)
+        searchBar = findViewById(R.id.search_bar)
+        btnSearch = findViewById(R.id.btn_search)
+        btnClearSearch = findViewById(R.id.btn_clear_search)
     }
 
     private fun setupBottomNavigation() {
@@ -204,6 +213,155 @@ class MainActivity : AppCompatActivity() {
             animateButtonPress(btnSettings)
             // TODO: Open settings activity when ready
         }
+    }
+
+    private fun setupSearchBar() {
+        // Search button click
+        btnSearch.setOnClickListener {
+            animateButtonPress(btnSearch)
+            val query = searchBar.text?.toString()?.trim()
+            if (!query.isNullOrEmpty()) {
+                searchAddress(query)
+            } else {
+                showStatusCard(getString(R.string.please_enter_address), isError = true)
+            }
+        }
+
+        // Clear search button
+        btnClearSearch.setOnClickListener {
+            animateButtonPress(btnClearSearch)
+            clearSearch()
+        }
+
+        // Handle Enter key on search bar
+        searchBar.setOnEditorActionListener { _, actionId, _ ->
+            if (actionId == android.view.inputmethod.EditorInfo.IME_ACTION_SEARCH) {
+                val query = searchBar.text?.toString()?.trim()
+                if (!query.isNullOrEmpty()) {
+                    searchAddress(query)
+                }
+                true
+            } else {
+                false
+            }
+        }
+
+        // Show/hide clear button based on text
+        searchBar.addTextChangedListener(object : TextWatcher {
+            override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
+            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {}
+            override fun afterTextChanged(s: android.text.Editable?) {
+                btnClearSearch.visibility = if (s.isNullOrEmpty()) View.GONE else View.VISIBLE
+            }
+        })
+    }
+
+    private fun searchAddress(query: String) {
+        showStatusCard(getString(R.string.searching_address), isLoading = true)
+
+        // Hide keyboard
+        val inputMethodManager = getSystemService(Context.INPUT_METHOD_SERVICE) as android.view.inputmethod.InputMethodManager
+        inputMethodManager.hideSoftInputFromWindow(searchBar.windowToken, 0)
+
+        try {
+            // Use geocoder to find address
+            val addresses: List<Address>? = geocoder.getFromLocationName(query, 1)
+
+            if (!addresses.isNullOrEmpty()) {
+                val address = addresses[0]
+                val location = GeoPoint(address.latitude, address.longitude)
+
+                // Animate to searched location
+                mapView.controller.animateTo(location, 16.0, 1000L)
+
+                // Add a temporary marker for the search result
+                addSearchResultMarker(location, address)
+
+                // Show success message with found address
+                val foundAddress = getFormattedAddress(address)
+                showStatusCard(getString(R.string.found_address, foundAddress), isLoading = false)
+
+                // Auto-hide status after 4 seconds
+                Handler(Looper.getMainLooper()).postDelayed({
+                    hideStatusCard()
+                }, 4000)
+
+            } else {
+                showStatusCard(getString(R.string.address_not_found), isError = true)
+            }
+        } catch (e: IOException) {
+            showStatusCard(getString(R.string.search_error), isError = true)
+        } catch (e: Exception) {
+            showStatusCard(getString(R.string.search_error), isError = true)
+        }
+    }
+
+    private fun clearSearch() {
+        searchBar.text?.clear()
+        btnClearSearch.visibility = View.GONE
+
+        // Remove search result marker if it exists
+        currentSearchMarker?.let { marker ->
+            mapView.overlays.remove(marker)
+            currentSearchMarker = null
+            mapView.invalidate()
+        }
+
+        hideStatusCard()
+    }
+
+    private fun getFormattedAddress(address: Address): String {
+        return buildString {
+            if (!address.thoroughfare.isNullOrEmpty()) {
+                append(address.thoroughfare)
+                if (!address.subThoroughfare.isNullOrEmpty()) {
+                    append(" ${address.subThoroughfare}")
+                }
+            } else if (!address.featureName.isNullOrEmpty()) {
+                append(address.featureName)
+            }
+
+            if (!address.locality.isNullOrEmpty()) {
+                if (isNotEmpty()) append(", ")
+                append(address.locality)
+            }
+
+            if (!address.adminArea.isNullOrEmpty()) {
+                if (isNotEmpty()) append(", ")
+                append(address.adminArea)
+            }
+
+            if (!address.countryName.isNullOrEmpty()) {
+                if (isNotEmpty()) append(", ")
+                append(address.countryName)
+            }
+        }
+    }
+
+    private fun addSearchResultMarker(location: GeoPoint, address: Address) {
+        // Remove previous search marker
+        currentSearchMarker?.let { marker ->
+            mapView.overlays.remove(marker)
+        }
+
+        currentSearchMarker = Marker(mapView).apply {
+            position = location
+            setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_BOTTOM)
+            icon = ContextCompat.getDrawable(this@MainActivity, R.drawable.ic_search_marker)
+            title = getString(R.string.search_result)
+            snippet = getFormattedAddress(address)
+
+            // Add entrance animation
+            alpha = 0f
+            ObjectAnimator.ofFloat(this, "alpha", 0f, 1f).apply {
+                duration = 500
+                interpolator = DecelerateInterpolator()
+                start()
+            }
+        }
+
+        mapView.overlays.add(currentSearchMarker)
+        mapView.invalidate()
     }
 
     private fun setupMap() {
@@ -510,8 +668,8 @@ class MainActivity : AppCompatActivity() {
         }
 
         circle.points = points
-        circle.fillColor = Color.parseColor("#20FF0000") // Translucent red
-        circle.strokeColor = Color.parseColor("#80FF0000") // Semi-transparent red ring
+        circle.fillColor = Color.parseColor("#20FF0000") // Translucent red for reports
+        circle.strokeColor = Color.parseColor("#80FF0000") // Semi-transparent red ring for reports
         circle.strokeWidth = 3f
 
         return circle

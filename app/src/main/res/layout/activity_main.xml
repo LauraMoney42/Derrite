@@ -1,32 +1,114 @@
 <?xml version="1.0" encoding="utf-8"?>
-<androidx.coordinatorlayout.widget.CoordinatorLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
-    android:layout_height="match_parent">
+    android:layout_height="match_parent"
+    android:background="@color/background">
 
     <!-- Map View -->
     <org.osmdroid.views.MapView
         android:id="@+id/mapView"
         android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        android:layout_marginBottom="56dp" />
+        android:layout_height="match_parent" />
+
+    <!-- Search Bar Container -->
+    <com.google.android.material.card.MaterialCardView
+        android:id="@+id/search_container"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="16dp"
+        android:layout_marginTop="16dp"
+        android:layout_marginEnd="16dp"
+        android:layout_toStartOf="@+id/fab_location"
+        app:cardCornerRadius="24dp"
+        app:cardElevation="8dp"
+        app:cardBackgroundColor="@color/surface">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:padding="4dp"
+            android:gravity="center_vertical">
+
+            <!-- Search Icon -->
+            <ImageButton
+                android:id="@+id/btn_search"
+                android:layout_width="48dp"
+                android:layout_height="48dp"
+                android:background="?attr/selectableItemBackgroundBorderless"
+                android:src="@drawable/ic_search"
+                android:contentDescription="@string/search"
+                android:padding="12dp"
+                app:tint="@color/icon_secondary" />
+
+            <!-- Search Input -->
+            <com.google.android.material.textfield.TextInputEditText
+                android:id="@+id/search_bar"
+                android:layout_width="0dp"
+                android:layout_height="48dp"
+                android:layout_weight="1"
+                android:background="@android:color/transparent"
+                android:hint="@string/search_address"
+                android:textColor="@color/text_primary"
+                android:textColorHint="@color/text_secondary"
+                android:textSize="16sp"
+                android:maxLines="1"
+                android:imeOptions="actionSearch"
+                android:inputType="text"
+                android:paddingStart="0dp"
+                android:paddingEnd="8dp" />
+
+            <!-- Clear Search Button -->
+            <ImageButton
+                android:id="@+id/btn_clear_search"
+                android:layout_width="48dp"
+                android:layout_height="48dp"
+                android:background="?attr/selectableItemBackgroundBorderless"
+                android:src="@drawable/ic_clear"
+                android:contentDescription="@string/clear_search"
+                android:padding="12dp"
+                android:visibility="gone"
+                app:tint="@color/icon_secondary" />
+
+        </LinearLayout>
+    </com.google.android.material.card.MaterialCardView>
+
+    <!-- Location FAB -->
+    <com.google.android.material.floatingactionbutton.FloatingActionButton
+        android:id="@+id/fab_location"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_alignParentTop="true"
+        android:layout_alignParentEnd="true"
+        android:layout_marginTop="16dp"
+        android:layout_marginEnd="16dp"
+        android:src="@drawable/ic_my_location_white"
+        android:contentDescription="@string/your_location"
+        app:backgroundTint="@color/fab_background"
+        app:tint="@color/fab_icon"
+        app:elevation="8dp"
+        app:fabSize="normal" />
 
     <!-- Status Card -->
     <com.google.android.material.card.MaterialCardView
         android:id="@+id/status_card"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_margin="16dp"
+        android:layout_below="@id/search_container"
+        android:layout_marginStart="16dp"
+        android:layout_marginTop="8dp"
+        android:layout_marginEnd="16dp"
         android:visibility="gone"
-        app:cardCornerRadius="8dp"
-        app:cardElevation="4dp"
-        app:layout_behavior="@string/appbar_scrolling_view_behavior">
+        app:cardCornerRadius="12dp"
+        app:cardElevation="6dp"
+        app:cardBackgroundColor="@color/surface">
 
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="horizontal"
-            android:padding="16dp"
+            android:padding="12dp"
             android:gravity="center_vertical">
 
             <TextView
@@ -34,77 +116,77 @@
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
-                android:text="Status message"
-                android:textSize="14sp" />
+                android:textColor="@color/text_primary"
+                android:textSize="14sp"
+                android:maxLines="2"
+                android:ellipsize="end" />
 
             <ImageButton
                 android:id="@+id/status_close"
-                android:layout_width="24dp"
-                android:layout_height="24dp"
+                android:layout_width="32dp"
+                android:layout_height="32dp"
                 android:background="?attr/selectableItemBackgroundBorderless"
-                android:src="@android:drawable/ic_menu_close_clear_cancel"
-                android:contentDescription="@string/close_status" />
+                android:src="@drawable/ic_close"
+                android:contentDescription="@string/close"
+                app:tint="@color/icon_secondary" />
 
         </LinearLayout>
-
     </com.google.android.material.card.MaterialCardView>
 
-    <!-- Instruction Overlay - No Close Button -->
+    <!-- Instruction Overlay -->
     <LinearLayout
         android:id="@+id/instruction_overlay"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginTop="80dp"
-        android:layout_marginStart="16dp"
-        android:layout_marginEnd="16dp"
-        android:background="@drawable/rounded_background"
-        android:padding="16dp"
+        android:layout_centerInParent="true"
+        android:layout_marginStart="32dp"
+        android:layout_marginEnd="32dp"
+        android:background="@drawable/instruction_background"
+        android:orientation="vertical"
+        android:padding="24dp"
         android:gravity="center">
 
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="@string/instruction_text"
-            android:textColor="@android:color/white"
-            android:textSize="14sp"
+            android:text="@string/instruction_title"
+            android:textColor="@color/text_primary"
+            android:textSize="18sp"
+            android:textStyle="bold"
             android:gravity="center" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:text="@string/instruction_description"
+            android:textColor="@color/text_secondary"
+            android:textSize="14sp"
+            android:gravity="center"
+            android:lineSpacingExtra="2dp" />
 
     </LinearLayout>
 
-    <!-- Location FAB - Top Right -->
-    <com.google.android.material.floatingactionbutton.FloatingActionButton
-        android:id="@+id/fab_location"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_gravity="end|top"
-        android:layout_margin="16dp"
-        android:src="@drawable/ic_my_location_white"
-        android:contentDescription="@string/location_button"
-        app:backgroundTint="@color/black" />
-
-    <!-- Bottom Navigation -->
+    <!-- Bottom Navigation Bar -->
     <LinearLayout
-        android:id="@+id/bottom_navigation"
         android:layout_width="match_parent"
-        android:layout_height="56dp"
-        android:layout_gravity="bottom"
-        android:background="@android:color/black"
-        android:elevation="8dp"
+        android:layout_height="wrap_content"
+        android:layout_alignParentBottom="true"
+        android:background="@color/bottom_nav_background"
         android:orientation="horizontal"
-        android:paddingHorizontal="16dp"
-        android:gravity="center_vertical">
+        android:padding="12dp">
 
         <!-- Language Toggle Button -->
         <Button
             android:id="@+id/btn_language_toggle"
             android:layout_width="wrap_content"
-            android:layout_height="40dp"
-            android:background="@drawable/language_toggle_background_dark"
+            android:layout_height="wrap_content"
             android:text="@string/language_toggle"
+            android:textColor="@color/bottom_nav_text"
+            android:background="?attr/selectableItemBackground"
+            android:padding="12dp"
             android:textSize="14sp"
-            android:textColor="@android:color/white"
-            android:paddingHorizontal="12dp"
-            style="@style/Widget.Material3.Button.TextButton" />
+            android:textAllCaps="false" />
 
         <!-- Spacer -->
         <View
@@ -119,9 +201,9 @@
             android:layout_height="48dp"
             android:background="?attr/selectableItemBackgroundBorderless"
             android:src="@drawable/ic_settings"
-            android:contentDescription="@string/settings_menu"
-            app:tint="@android:color/white" />
+            android:contentDescription="@string/settings"
+            app:tint="@color/bottom_nav_icon" />
 
     </LinearLayout>
 
-</androidx.coordinatorlayout.widget.CoordinatorLayout>
+</RelativeLayout>
