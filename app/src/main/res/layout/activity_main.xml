@@ -1,110 +1,160 @@
 <?xml version="1.0" encoding="utf-8"?>
-<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<androidx.coordinatorlayout.widget.CoordinatorLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
+    android:fitsSystemWindows="false"
     tools:context=".MainActivity">
 
-    <!-- OpenStreetMap View -->
+    <!-- Map View -->
     <org.osmdroid.views.MapView
         android:id="@+id/mapView"
         android:layout_width="match_parent"
-        android:layout_height="match_parent" />
+        android:layout_height="match_parent"
+        android:layout_marginBottom="56dp" />
 
-    <!-- Professional Location Button -->
-    <com.google.android.material.floatingactionbutton.FloatingActionButton
-        android:id="@+id/fab_location"
-        style="@style/Widget.App.FloatingActionButton"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_gravity="bottom|end"
-        android:layout_margin="20dp"
-        android:src="@drawable/ic_my_location"
-        android:contentDescription="Find my location"
-        app:backgroundTint="@color/white"
-        app:tint="@color/primary"
-        app:borderWidth="0dp"
-        app:elevation="12dp"
-        app:hoveredFocusedTranslationZ="16dp"
-        app:pressedTranslationZ="20dp"
-        app:rippleColor="@color/primary"
-        app:fabSize="normal" />
-
-    <!-- Status Card (for future use - like "Location found") -->
+    <!-- Status Card -->
     <com.google.android.material.card.MaterialCardView
         android:id="@+id/status_card"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_gravity="top"
-        android:layout_marginHorizontal="16dp"
-        android:layout_marginTop="20dp"
+        android:layout_margin="16dp"
         android:visibility="gone"
-        app:cardBackgroundColor="@color/surface"
-        app:cardCornerRadius="12dp"
-        app:cardElevation="8dp"
-        app:strokeWidth="0dp">
+        app:cardCornerRadius="8dp"
+        app:cardElevation="4dp"
+        app:layout_anchor="@id/mapView"
+        app:layout_anchorGravity="top">
 
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="horizontal"
-            android:padding="16dp"
-            android:gravity="center_vertical">
-
-            <ImageView
-                android:id="@+id/status_icon"
-                android:layout_width="24dp"
-                android:layout_height="24dp"
-                android:src="@drawable/ic_my_location"
-                app:tint="@color/success" />
+            android:padding="16dp">
 
             <TextView
                 android:id="@+id/status_text"
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
-                android:layout_marginStart="12dp"
-                android:text="Location found"
-                android:textColor="@color/on_surface"
-                android:textSize="14sp"
-                android:fontFamily="sans-serif-medium" />
+                android:text="Status message"
+                android:textSize="14sp" />
 
             <ImageButton
                 android:id="@+id/status_close"
-                android:layout_width="32dp"
-                android:layout_height="32dp"
+                android:layout_width="24dp"
+                android:layout_height="24dp"
                 android:background="?attr/selectableItemBackgroundBorderless"
-                android:src="@android:drawable/ic_menu_close_clear_cancel"
-                app:tint="@color/text_secondary"
-                android:contentDescription="Close" />
+                android:src="@android:drawable/ic_menu_close_clear_cancel" />
 
         </LinearLayout>
 
     </com.google.android.material.card.MaterialCardView>
 
-    <!-- App Title/Logo Area (for future branding) -->
+    <!-- Instruction Overlay -->
     <LinearLayout
-        android:layout_width="wrap_content"
+        android:id="@+id/instruction_overlay"
+        android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_gravity="top|start"
-        android:layout_margin="20dp"
-        android:background="@drawable/fab_background"
-        android:orientation="horizontal"
-        android:padding="12dp"
-        android:elevation="8dp"
-        android:visibility="gone">
+        android:layout_margin="24dp"
+        android:background="#F5F5F5"
+        android:orientation="vertical"
+        android:padding="16dp"
+        android:visibility="visible"
+        android:layout_gravity="center">
 
         <TextView
-            android:layout_width="wrap_content"
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="Safety Alert"
-            android:textColor="@color/primary"
-            android:textSize="16sp"
-            android:fontFamily="sans-serif-medium" />
+            android:text="📍 Long press anywhere on the map to create anonymous reports"
+            android:textSize="14sp"
+            android:gravity="center" />
 
     </LinearLayout>
 
-    <!-- We'll add the report button here later in a different position -->
+    <!-- Find My Location FAB -->
+    <com.google.android.material.floatingactionbutton.FloatingActionButton
+        android:id="@+id/fab_location"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_margin="16dp"
+        android:layout_marginBottom="72dp"
+        android:src="@android:drawable/ic_menu_mylocation"
+        android:contentDescription="Find my location"
+        app:tint="@android:color/white"
+        app:backgroundTint="#6C7B7F"
+        app:elevation="8dp"
+        app:layout_anchor="@id/mapView"
+        app:layout_anchorGravity="bottom|end" />
 
-</FrameLayout>
+    <!-- Bottom Navigation Bar -->
+    <LinearLayout
+        android:id="@+id/bottom_navigation"
+        android:layout_width="match_parent"
+        android:layout_height="56dp"
+        android:layout_gravity="bottom"
+        android:background="#000000"
+        android:orientation="horizontal"
+        android:elevation="8dp">
+
+        <LinearLayout
+            android:id="@+id/nav_alerts"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1"
+            android:clickable="true"
+            android:focusable="true"
+            android:background="?attr/selectableItemBackground"
+            android:gravity="center"
+            android:orientation="vertical"
+            android:padding="8dp">
+
+            <ImageView
+                android:layout_width="24dp"
+                android:layout_height="24dp"
+                android:src="@android:drawable/ic_popup_reminder"
+                android:contentDescription="Alerts"
+                app:tint="@android:color/white" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Alerts"
+                android:textColor="@android:color/white"
+                android:textSize="10sp"
+                android:layout_marginTop="2dp" />
+
+        </LinearLayout>
+
+        <LinearLayout
+            android:id="@+id/nav_settings"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1"
+            android:clickable="true"
+            android:focusable="true"
+            android:background="?attr/selectableItemBackground"
+            android:gravity="center"
+            android:orientation="vertical"
+            android:padding="8dp">
+
+            <ImageView
+                android:layout_width="24dp"
+                android:layout_height="24dp"
+                android:src="@android:drawable/ic_menu_preferences"
+                android:contentDescription="Settings"
+                app:tint="@android:color/white" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Settings"
+                android:textColor="@android:color/white"
+                android:textSize="10sp"
+                android:layout_marginTop="2dp" />
+
+        </LinearLayout>
+
+    </LinearLayout>
+
+</androidx.coordinatorlayout.widget.CoordinatorLayout>
