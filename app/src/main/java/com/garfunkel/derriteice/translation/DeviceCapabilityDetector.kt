@@ -13,7 +13,7 @@ import java.io.File
 class DeviceCapabilityDetector(private val context: Context) {
 
     companion object {
-        private const val TAG = "DeviceCapabilityDetector"
+        private const val TAG = "DeviceCapability" // Shortened from 24 to 16 characters
 
         // Minimum requirements for ML Kit
         private const val MIN_RAM_MB = 2048 // 2GB RAM
@@ -94,7 +94,7 @@ class DeviceCapabilityDetector(private val context: Context) {
             }
             availableBytes / (1024 * 1024)
         } catch (e: Exception) {
-            Log.w(TAG, "Could not determine storage")
+            Log.w(TAG, "Could not determine storage", e)
             100 // Conservative estimate
         }
     }
