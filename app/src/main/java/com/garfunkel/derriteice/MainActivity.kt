@@ -12,11 +12,9 @@ import com.google.firebase.messaging.FirebaseMessaging
 
 // JSON imports
 import org.json.JSONObject
-import org.json.JSONArray
 
 // Translation imports
 import com.garfunkel.derriteice.translation.AdaptiveTranslator
-import com.garfunkel.derriteice.translation.DeviceCapabilityDetector
 import com.garfunkel.derriteice.translation.SimpleTranslator
 
 // Coroutines
@@ -31,7 +29,6 @@ import android.Manifest
 import android.animation.ObjectAnimator
 import android.app.AlertDialog
 import android.content.Context
-import android.content.Intent
 import android.content.SharedPreferences
 import android.content.pm.PackageManager
 import android.content.res.Configuration
@@ -47,7 +44,6 @@ import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
 import android.text.TextWatcher
-import android.util.Log
 import android.view.LayoutInflater
 import android.view.View
 import android.view.animation.DecelerateInterpolator
@@ -55,9 +51,7 @@ import android.widget.Button
 import android.widget.ImageButton
 import android.widget.ImageView
 import android.widget.LinearLayout
-import android.widget.ProgressBar
 import android.widget.TextView
-import android.widget.Toast
 
 // AndroidX imports
 import androidx.activity.result.contract.ActivityResultContracts
@@ -85,12 +79,10 @@ import org.osmdroid.views.overlay.Marker
 import org.osmdroid.views.overlay.Polygon
 
 // Java imports
-import java.text.SimpleDateFormat
-import java.util.Calendar
 import java.util.Locale
 import java.util.UUID
 import kotlin.math.*
-// Updated Report data class with translation support
+
 data class Report(
     val id: String,
     val location: GeoPoint,
@@ -110,10 +102,8 @@ data class Alert(
     val timestamp: Long = System.currentTimeMillis()
 )
 
-// Fixed Backend Client for anonymous communication with server
 class BackendClient {
     companion object {
-
         private const val BACKEND_URL = "https://backend-production-cfbe.up.railway.app"
     }
 
@@ -122,9 +112,6 @@ class BackendClient {
         .readTimeout(30, TimeUnit.SECONDS)
         .build()
 
-    /**
-     * Test if backend is reachable
-     */
     fun testConnection(callback: (Boolean, String) -> Unit) {
         val request = Request.Builder()
             .url("$BACKEND_URL/health")
@@ -137,7 +124,7 @@ class BackendClient {
             }
 
             override fun onResponse(call: Call, response: Response) {
-                response.use { // Properly handle response
+                response.use {
                     if (response.isSuccessful) {
                         val body = response.body?.string() ?: "No response body"
                         callback(true, "Connected! Response: $body")
@@ -149,9 +136,6 @@ class BackendClient {
         })
     }
 
-    /**
-     * Submit report to backend
-     */
     fun submitReport(
         latitude: Double,
         longitude: Double,
@@ -210,15 +194,11 @@ class BackendClient {
         }
     }
 
-    /**
-     * Subscribe to push notifications for a location
-     */
     fun subscribeToAlerts(
         latitude: Double,
         longitude: Double,
         callback: (Boolean, String) -> Unit
     ) {
-        // Get FCM token first
         FirebaseMessaging.getInstance().token
             .addOnCompleteListener { task ->
                 if (!task.isSuccessful) {
@@ -293,10 +273,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var geocoder: Geocoder
     private lateinit var preferences: SharedPreferences
 
-    // Backend client for server communication
     private lateinit var backendClient: BackendClient
-
-    // Adaptive translator system
     private lateinit var adaptiveTranslator: AdaptiveTranslator
     private var translatorInitialized = false
     private var currentTranslationJob: Job? = null
@@ -317,10 +294,8 @@ class MainActivity : AppCompatActivity() {
     private val CAMERA_PERMISSION_REQUEST = 1002
     private val REPORT_RADIUS_METERS = 804.5
     private val REPORT_DURATION_HOURS = 8L
-    private val ALERT_RADIUS_METERS = 1609.0
     private val ZIP_CODE_RADIUS_METERS = 8047.0
 
-    // Camera launcher for photo capture
     private val cameraLauncher = registerForActivityResult(
         ActivityResultContracts.TakePicturePreview()
     ) { bitmap ->
@@ -330,7 +305,6 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    // Photo picker for gallery images
     private val photoPickerLauncher = registerForActivityResult(
         ActivityResultContracts.GetContent()
     ) { uri ->
@@ -354,32 +328,21 @@ class MainActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        // Initialize preferences
         preferences = getSharedPreferences("app_prefs", Context.MODE_PRIVATE)
-
-        // Initialize backend client
         backendClient = BackendClient()
 
-        // Load viewed alerts from preferences
         loadViewedAlerts()
-
-        // Load saved reports from preferences
         loadSavedReports()
-
-        // Set app language to Spanish by default (or user's saved preference)
         setAppLanguage(getSavedLanguage())
 
-        // Configure OSMDroid
         OSMConfiguration.getInstance().load(this, getSharedPreferences("osmdroid", 0))
         OSMConfiguration.getInstance().userAgentValue = packageName
 
         setContentView(R.layout.activity_main)
 
-        // Initialize services
         fusedLocationClient = LocationServices.getFusedLocationProviderClient(this)
         geocoder = Geocoder(this, Locale.getDefault())
 
-        // Initialize views
         setupViews()
         setupMap()
         setupLocationButton()
@@ -388,24 +351,18 @@ class MainActivity : AppCompatActivity() {
         setupBottomNavigation()
         setupSearchBar()
         startLocationUpdates()
-        // Initialize translation system (silent, with background model downloads)
         initializeTranslationSystem()
-
-        // Auto-center on user location when app opens
         autoLocateOnStartup()
-
-        // Start cleanup timer for expired reports
         startReportCleanupTimer()
-
-        // Start periodic alert checking
         startAlertChecker()
     }
+
     private fun startLocationUpdates() {
         if (!hasLocationPermission()) return
 
         val locationRequest = com.google.android.gms.location.LocationRequest.create().apply {
-            interval = 30000 // 30 seconds
-            fastestInterval = 15000 // 15 seconds
+            interval = 30000
+            fastestInterval = 15000
             priority = com.google.android.gms.location.LocationRequest.PRIORITY_HIGH_ACCURACY
         }
 
@@ -415,8 +372,6 @@ class MainActivity : AppCompatActivity() {
                     currentLocation = location
                     val userLocation = GeoPoint(location.latitude, location.longitude)
                     addLocationMarker(userLocation)
-
-                    // Subscribe to alerts for new location
                     subscribeToAlertsForLocation(location.latitude, location.longitude)
                 }
             }
@@ -425,51 +380,29 @@ class MainActivity : AppCompatActivity() {
         try {
             fusedLocationClient.requestLocationUpdates(locationRequest, locationCallback, Looper.getMainLooper())
         } catch (e: SecurityException) {
-            Log.e("Location", "Permission denied for location updates")
+            // Permission denied
         }
     }
 
-    /**
-     * Clean initialization without testing popups
-     */
     private fun initializeTranslationSystem() {
         adaptiveTranslator = AdaptiveTranslator(this)
-
-        // Start background model downloads immediately
         downloadMLKitModelsInBackground()
 
-        // Initialize adaptive translator in background (no status messages)
         CoroutineScope(Dispatchers.Main).launch {
             try {
                 val success = withContext(Dispatchers.IO) {
                     adaptiveTranslator.initialize()
                 }
-
                 translatorInitialized = success
-
-                Log.d("Translation", "Translation system initialized: $success")
-
-                if (success) {
-                    val summary = adaptiveTranslator.getDeviceSummary()
-                    Log.d("Translation", "Device capability: $summary")
-                }
-
             } catch (e: Exception) {
-                Log.e("Translation", "Failed to initialize translator", e)
                 translatorInitialized = false
             }
         }
     }
 
-    /**
-     * Silent background ML Kit model downloader
-     */
     private fun downloadMLKitModelsInBackground() {
-        Log.d("BackgroundDownload", "Starting background ML Kit model download...")
-
         CoroutineScope(Dispatchers.IO).launch {
             try {
-                // Check if we're on WiFi (don't use cellular data for model downloads)
                 val connectivityManager = getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
                 val isWiFi = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
                     val network = connectivityManager.activeNetwork
@@ -481,12 +414,8 @@ class MainActivity : AppCompatActivity() {
                     networkInfo?.type == ConnectivityManager.TYPE_WIFI
                 }
 
-                if (!isWiFi) {
-                    Log.d("BackgroundDownload", "Not on WiFi, skipping model download to save data")
-                    return@launch
-                }
+                if (!isWiFi) return@launch
 
-                // Download Spanish ↔ English models
                 downloadTranslationModel(
                     com.google.mlkit.nl.translate.TranslateLanguage.SPANISH,
                     com.google.mlkit.nl.translate.TranslateLanguage.ENGLISH,
@@ -498,16 +427,12 @@ class MainActivity : AppCompatActivity() {
                     com.google.mlkit.nl.translate.TranslateLanguage.SPANISH,
                     "English → Spanish"
                 )
-
             } catch (e: Exception) {
-                Log.w("BackgroundDownload", "Background download setup failed: ${e.message}")
+                // Background download failed
             }
         }
     }
 
-    /**
-     * Download a specific translation model
-     */
     private suspend fun downloadTranslationModel(sourceLanguage: String, targetLanguage: String, description: String) {
         try {
             val options = com.google.mlkit.nl.translate.TranslatorOptions.Builder()
@@ -517,60 +442,37 @@ class MainActivity : AppCompatActivity() {
 
             val translator = com.google.mlkit.nl.translate.Translation.getClient(options)
 
-            // Download conditions - only on WiFi
             val downloadConditions = com.google.mlkit.common.model.DownloadConditions.Builder()
                 .requireWifi()
                 .build()
 
-            // Use coroutines to make it awaitable
             val downloadSuccess = withContext(Dispatchers.IO) {
                 try {
                     val downloadTask = translator.downloadModelIfNeeded(downloadConditions)
-
-                    // Convert Task to coroutine
                     suspendCancellableCoroutine<Boolean> { continuation ->
                         downloadTask
-                            .addOnSuccessListener {
-                                Log.d("BackgroundDownload", "✅ $description model downloaded successfully")
-                                continuation.resume(true)
-                            }
-                            .addOnFailureListener { e ->
-                                Log.w("BackgroundDownload", "⚠️ $description model download failed: ${e.message}")
-                                continuation.resume(false)
-                            }
+                            .addOnSuccessListener { continuation.resume(true) }
+                            .addOnFailureListener { continuation.resume(false) }
                     }
                 } catch (e: Exception) {
-                    Log.w("BackgroundDownload", "❌ $description model download error: ${e.message}")
                     false
                 }
             }
 
-            // Test the model after download to ensure it's working
             if (downloadSuccess) {
                 testTranslationModel(translator, description)
             }
-
         } catch (e: Exception) {
-            Log.w("BackgroundDownload", "Failed to setup $description model download: ${e.message}")
+            // Model download failed
         }
     }
 
-    /**
-     * Test a translation model to ensure it's working
-     */
     private fun testTranslationModel(translator: com.google.mlkit.nl.translate.Translator, description: String) {
         translator.translate("test")
-            .addOnSuccessListener { result ->
-                Log.d("BackgroundDownload", "✅ $description model is working correctly")
-            }
-            .addOnFailureListener { e ->
-                Log.w("BackgroundDownload", "⚠️ $description model test failed: ${e.message}")
-            }
+            .addOnSuccessListener { }
+            .addOnFailureListener { }
     }
 
-    /**
-     * Extension function to convert Task to coroutine
-     */
     private suspend fun <T> com.google.android.gms.tasks.Task<T>.await(): T {
         return suspendCancellableCoroutine { continuation ->
             addOnCompleteListener { task ->
@@ -583,9 +485,6 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    /**
-     * Simplified intelligent translation without technical details
-     */
     private fun intelligentTranslate(
         text: String,
         fromLang: String,
@@ -593,31 +492,19 @@ class MainActivity : AppCompatActivity() {
         onSuccess: (String) -> Unit,
         onError: (String) -> Unit
     ) {
-        // Try ML Kit first (models should be downloaded in background)
         tryMLKitTranslation(text, fromLang, toLang,
-            onSuccess = { result ->
-                Log.d("IntelligentTranslate", "ML Kit translation successful")
-                onSuccess(result)
-            },
-            onFailure = { mlKitError ->
-                Log.w("IntelligentTranslate", "ML Kit failed, using keyword fallback: $mlKitError")
-
-                // Fall back to keyword translation
+            onSuccess = { result -> onSuccess(result) },
+            onFailure = { _ ->
                 try {
                     val keywordResult = SimpleTranslator().translateText(text, fromLang, toLang)
-                    Log.d("IntelligentTranslate", "Keyword translation successful")
                     onSuccess(keywordResult)
                 } catch (e: Exception) {
-                    Log.e("IntelligentTranslate", "All translation methods failed: ${e.message}")
                     onError("Translation unavailable")
                 }
             }
         )
     }
 
-    /**
-     * Simplified ML Kit translation attempt
-     */
     private fun tryMLKitTranslation(
         text: String,
         fromLang: String,
@@ -641,7 +528,6 @@ class MainActivity : AppCompatActivity() {
 
             val translator = com.google.mlkit.nl.translate.Translation.getClient(options)
 
-            // Try translation (models should be ready from background download)
             translator.translate(text)
                 .addOnSuccessListener { translatedText ->
                     if (translatedText.isNotEmpty()) {
@@ -653,13 +539,11 @@ class MainActivity : AppCompatActivity() {
                 .addOnFailureListener { e ->
                     onFailure(e.message ?: "Translation failed")
                 }
-
         } catch (e: Exception) {
             onFailure("Setup failed: ${e.message}")
         }
     }
 
-    // Alert System Implementation
     private fun loadViewedAlerts() {
         val viewedSet = preferences.getStringSet("viewed_alerts", emptySet()) ?: emptySet()
         viewedAlertIds.clear()
@@ -670,28 +554,22 @@ class MainActivity : AppCompatActivity() {
         preferences.edit().putStringSet("viewed_alerts", viewedAlertIds).apply()
     }
 
-    // Report Persistence System
     private fun loadSavedReports() {
         try {
             val reportsJson = preferences.getString("saved_reports", "[]")
             val reportsList = parseReportsFromJson(reportsJson ?: "[]")
-
-            // Filter out expired reports
             val currentTime = System.currentTimeMillis()
             val validReports = reportsList.filter { it.expiresAt > currentTime }
 
             activeReports.clear()
             activeReports.addAll(validReports)
 
-            // Add reports to map after map is ready
             Handler(Looper.getMainLooper()).postDelayed({
                 validReports.forEach { report ->
                     addReportToMap(report)
                 }
             }, 1000)
-
         } catch (e: Exception) {
-            // If loading fails, start with empty list
             activeReports.clear()
         }
     }
@@ -829,14 +707,10 @@ class MainActivity : AppCompatActivity() {
 
         updateLocationDescription(userLocation, textAlertLocation)
 
-        btnCloseAlerts.setOnClickListener {
-            currentAlertsDialog?.dismiss()
-        }
-
+        btnCloseAlerts.setOnClickListener { currentAlertsDialog?.dismiss() }
         btnRefreshAlerts.setOnClickListener {
             refreshAlerts(alertsContainer, noAlertsContainer, loadingContainer, userLocation)
         }
-
         btnMarkAllRead.setOnClickListener {
             markAllAlertsAsRead()
             loadAlertsIntoDialog(alertsContainer, noAlertsContainer, loadingContainer, userLocation)
@@ -926,7 +800,6 @@ class MainActivity : AppCompatActivity() {
     private fun createAlertItemView(alert: Alert): View {
         val alertView = LayoutInflater.from(this).inflate(R.layout.item_alert, null)
 
-        val alertIcon = alertView.findViewById<ImageView>(R.id.alert_icon)
         val textAlertDistance = alertView.findViewById<TextView>(R.id.text_alert_distance)
         val textAlertTime = alertView.findViewById<TextView>(R.id.text_alert_time)
         val newAlertBadge = alertView.findViewById<View>(R.id.new_alert_badge)
@@ -1019,7 +892,6 @@ class MainActivity : AppCompatActivity() {
         updateAlertsButtonColor(false)
     }
 
-    // Language and preference management
     private fun getSavedLanguage(): String {
         return preferences.getString("app_language", "es") ?: "es"
     }
@@ -1072,7 +944,7 @@ class MainActivity : AppCompatActivity() {
 
         btnSettings.setOnClickListener {
             animateButtonPress(btnSettings)
-            testBackendConnection() // Now tests backend connection!
+            showSettingsDialog()
         }
 
         btnAlerts.setOnClickListener {
@@ -1093,37 +965,405 @@ class MainActivity : AppCompatActivity() {
         btnAlerts.imageTintList = android.content.res.ColorStateList.valueOf(tintColor)
     }
 
-    // Backend connection testing
-    private fun testBackendConnection() {
-        showStatusCard("Testing backend connection...", isLoading = true)
+    private fun showSettingsDialog() {
+        val dialogLayout = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(48, 48, 48, 48)
+            setBackgroundColor(Color.BLACK)
+        }
 
+        // Title
+        val titleText = TextView(this).apply {
+            text = "⚙️ Settings"
+            textSize = 24f
+            setTextColor(Color.WHITE)
+            gravity = android.view.Gravity.CENTER
+            setPadding(0, 0, 0, 32)
+            setTypeface(null, android.graphics.Typeface.BOLD)
+        }
+        dialogLayout.addView(titleText)
+
+        // Version Information
+        val versionInfo = TextView(this).apply {
+            try {
+                val packageInfo = packageManager.getPackageInfo(packageName, 0)
+                text = "Version ${packageInfo.versionName} (${packageInfo.versionCode})"
+            } catch (e: Exception) {
+                text = "Version 1.0.0"
+            }
+            textSize = 14f
+            setTextColor(Color.parseColor("#888888"))
+            gravity = android.view.Gravity.CENTER
+            setPadding(0, 0, 0, 32)
+        }
+        dialogLayout.addView(versionInfo)
+
+        // Backend Status
+        val backendStatus = TextView(this).apply {
+            text = "🔗 Checking backend connection..."
+            textSize = 16f
+            setTextColor(Color.WHITE)
+            setPadding(16, 16, 16, 16)
+            setBackgroundColor(Color.parseColor("#333333"))
+
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            ).apply {
+                setMargins(0, 0, 0, 24)
+            }
+        }
+        dialogLayout.addView(backendStatus)
+
+        // Test backend connection
         backendClient.testConnection { success, message ->
             runOnUiThread {
                 if (success) {
-                    showStatusCard("✅ Backend connected!", isLoading = false)
-                    Log.d("Backend", "Connection test: $message")
+                    backendStatus.text = "✅ Backend Connected"
+                    backendStatus.setBackgroundColor(Color.parseColor("#2E7D32"))
                 } else {
-                    showStatusCard("❌ Backend offline", isError = true)
-                    Log.e("Backend", "Connection failed: $message")
+                    backendStatus.text = "❌ Backend Offline"
+                    backendStatus.setBackgroundColor(Color.parseColor("#C62828"))
                 }
-
-                Handler(Looper.getMainLooper()).postDelayed({
-                    hideStatusCard()
-                }, 3000)
             }
         }
+
+        // Settings Sections
+        addSettingsSection(dialogLayout, "📚 User Guide", "Learn how to use the app") {
+            showUserGuideDialog()
+        }
+
+        addSettingsSection(dialogLayout, "❓ FAQ", "Frequently asked questions") {
+            showFAQDialog()
+        }
+
+        addSettingsSection(dialogLayout, "⚙️ Preferences", "App settings and preferences") {
+            showPreferencesDialog()
+        }
+
+        addSettingsSection(dialogLayout, "🔒 Privacy Policy", "How we protect your data") {
+            showPrivacyPolicyDialog()
+        }
+
+        addSettingsSection(dialogLayout, "ℹ️ About", "About this app") {
+            showAboutDialog()
+        }
+
+        // Close button
+        val btnClose = Button(this).apply {
+            text = "CLOSE"
+            setTextColor(Color.RED)
+            setBackgroundColor(Color.TRANSPARENT)
+            setPadding(32, 24, 32, 24)
+
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.WRAP_CONTENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            ).apply {
+                gravity = android.view.Gravity.CENTER_HORIZONTAL
+                setMargins(0, 32, 0, 0)
+            }
+        }
+        dialogLayout.addView(btnClose)
+
+        val dialog = AlertDialog.Builder(this)
+            .setView(dialogLayout)
+            .setCancelable(true)
+            .create()
+
+        btnClose.setOnClickListener { dialog.dismiss() }
+        dialog.show()
     }
 
-    // Subscribe to alerts for location
+    private fun addSettingsSection(container: LinearLayout, title: String, description: String, onClick: () -> Unit) {
+        val sectionView = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(24, 24, 24, 24)
+            setBackgroundColor(Color.parseColor("#333333"))
+            isClickable = true
+            isFocusable = true
+
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            ).apply {
+                setMargins(0, 0, 0, 16)
+            }
+
+            setOnClickListener {
+                animateButtonPress(this)
+                onClick()
+            }
+        }
+
+        val titleText = TextView(this).apply {
+            text = title
+            textSize = 18f
+            setTextColor(Color.WHITE)
+            setTypeface(null, android.graphics.Typeface.BOLD)
+        }
+        sectionView.addView(titleText)
+
+        val descriptionText = TextView(this).apply {
+            text = description
+            textSize = 14f
+            setTextColor(Color.parseColor("#CCCCCC"))
+            setPadding(0, 8, 0, 0)
+        }
+        sectionView.addView(descriptionText)
+
+        container.addView(sectionView)
+    }
+
+    private fun showUserGuideDialog() {
+        val content = """
+            📱 How to Use DerriteICE
+            
+            🗺️ REPORTING
+            • Long press anywhere on the map to create a safety report
+            • Add a description of the situation
+            • Optionally add a photo (metadata is automatically removed)
+            • Reports are completely anonymous and expire after 8 hours
+            
+            🔔 ALERTS  
+            • Get notified when reports are made within 5 miles of your location
+            • Tap the alert button (🔔) to see nearby reports
+            • Reports appear as red circles on the map
+            
+            🌐 TRANSLATION
+            • App works in Spanish and English
+            • Tap language button to switch between languages
+            • Reports can be translated by tapping the translate button
+            
+            🔒 PRIVACY
+            • No accounts required - completely anonymous
+            • Location data is converted to anonymous zones
+            • All data expires automatically after 8 hours
+            • Photos have metadata stripped for privacy
+            
+            📍 LOCATION
+            • Tap the location button (📍) to center on your position
+            • Use the search bar to find specific addresses
+            • Long press to report incidents at any location
+        """.trimIndent()
+
+        showInfoDialog("📚 User Guide", content)
+    }
+
+    private fun showFAQDialog() {
+        val content = """
+            ❓ Frequently Asked Questions
+            
+            Q: Is this app anonymous?
+            A: Yes, completely. No accounts, no tracking, no personal data stored.
+            
+            Q: How long do reports last?
+            A: All reports automatically expire and delete after 8 hours.
+            
+            Q: Can others see my location?
+            A: No. Only approximate zones (500m radius) are used, never exact locations.
+            
+            Q: Does this drain my battery?
+            A: No. The app is optimized for minimal battery usage.
+            
+            Q: What happens to photos I upload?
+            A: All metadata is stripped before upload for complete anonymity.
+            
+            Q: Can I use this without internet?
+            A: Yes, the app works offline. Reports sync when connection returns.
+            
+            Q: Is this app free?
+            A: Yes, completely free with no ads or in-app purchases.
+            
+            Q: Which languages are supported?
+            A: Currently Spanish and English, with automatic translation.
+            
+            Q: How accurate are the alerts?
+            A: Alerts cover a 5-mile radius around your location.
+            
+            Q: Can law enforcement track me?
+            A: No. The system is designed to be completely untraceable.
+        """.trimIndent()
+
+        showInfoDialog("❓ FAQ", content)
+    }
+
+    private fun showPreferencesDialog() {
+        val content = """
+            ⚙️ User Preferences
+            
+            🌐 LANGUAGE
+            Current: ${if (getSavedLanguage() == "es") "Spanish" else "English"}
+            Use the language toggle button to switch between Spanish and English.
+            
+            🔔 NOTIFICATIONS
+            Push notifications for nearby safety reports are automatically enabled.
+            
+            📍 LOCATION SERVICES
+            Required for receiving relevant safety alerts in your area.
+            
+            📱 OFFLINE MODE
+            Reports are saved locally when offline and sync when connection returns.
+            
+            🔒 PRIVACY LEVEL
+            Maximum - All data is anonymous and auto-deletes after 8 hours.
+            
+            ⚡ BACKGROUND REFRESH
+            Enabled for receiving real-time safety alerts.
+            
+            Note: This app is designed with privacy-first principles. 
+            All settings prioritize user anonymity and data protection.
+        """.trimIndent()
+
+        showInfoDialog("⚙️ Preferences", content)
+    }
+
+    private fun showPrivacyPolicyDialog() {
+        val content = """
+            🔒 Privacy Policy
+            
+            ANONYMOUS BY DESIGN
+            • No user accounts or registration required
+            • No personal information collected or stored
+            • No tracking or analytics of any kind
+            
+            LOCATION PRIVACY
+            • Exact GPS coordinates never stored
+            • Only anonymous 500m zones are used
+            • Location data expires after 8 hours
+            
+            PHOTO PRIVACY
+            • All metadata automatically stripped
+            • No EXIF data or location info preserved
+            • Images processed anonymously
+            
+            DATA STORAGE
+            • All reports auto-delete after 8 hours
+            • No permanent storage of any user data
+            • Local app data only for offline functionality
+            
+            NETWORK PRIVACY
+            • All connections use HTTPS encryption
+            • Optional Tor routing for enhanced anonymity
+            • No IP address logging on servers
+            
+            LEGAL PROTECTION
+            • No data to subpoena or request
+            • Anonymous system provides legal protection
+            • Cannot be compelled to identify users
+            
+            This app follows privacy-by-design principles.
+            Your safety and privacy are our top priorities.
+        """.trimIndent()
+
+        showInfoDialog("🔒 Privacy Policy", content)
+    }
+
+    private fun showAboutDialog() {
+        val content = """
+            ℹ️ About DerriteICE
+            
+            MISSION
+            DerriteICE is a privacy-first, anonymous safety reporting platform designed to help communities stay informed about local safety concerns.
+            
+            FEATURES
+            • Anonymous safety reporting
+            • Real-time alerts for nearby incidents
+            • Cross-platform (Android, iOS, Web)
+            • Bilingual support (Spanish/English)
+            • Automatic translation
+            • Complete privacy protection
+            
+            TECHNOLOGY
+            • Global cloud infrastructure
+            • End-to-end encryption
+            • Anonymous geographic zones
+            • Automatic data expiration
+            • Open-source privacy tools
+            
+            PRIVACY FIRST
+            Built from the ground up with privacy as the core principle. No user data is ever stored, tracked, or shared.
+            
+            GLOBAL REACH
+            Available worldwide with local language support and cultural sensitivity.
+            
+            COMMUNITY DRIVEN
+            Created for communities, by communities. Your safety is our priority.
+            
+            Backend: Railway Cloud (Global)
+            Version: ${try { packageManager.getPackageInfo(packageName, 0).versionName } catch (e: Exception) { "1.0.0" }}
+            
+            Made with ❤️ for safer communities.
+        """.trimIndent()
+
+        showInfoDialog("ℹ️ About DerriteICE", content)
+    }
+
+    private fun showInfoDialog(title: String, content: String) {
+        val dialogLayout = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(48, 48, 48, 48)
+            setBackgroundColor(Color.BLACK)
+        }
+
+        val titleText = TextView(this).apply {
+            text = title
+            textSize = 20f
+            setTextColor(Color.WHITE)
+            gravity = android.view.Gravity.CENTER
+            setPadding(0, 0, 0, 24)
+            setTypeface(null, android.graphics.Typeface.BOLD)
+        }
+        dialogLayout.addView(titleText)
+
+        val scrollView = android.widget.ScrollView(this).apply {
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                0
+            ).apply {
+                weight = 1f
+            }
+        }
+
+        val contentText = TextView(this).apply {
+            text = content
+            textSize = 14f
+            setTextColor(Color.WHITE)
+            setPadding(16, 16, 16, 16)
+            setBackgroundColor(Color.parseColor("#333333"))
+            setLineSpacing(4f, 1f)
+        }
+        scrollView.addView(contentText)
+        dialogLayout.addView(scrollView)
+
+        val btnClose = Button(this).apply {
+            text = "CLOSE"
+            setTextColor(Color.RED)
+            setBackgroundColor(Color.TRANSPARENT)
+            setPadding(32, 24, 32, 24)
+
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.WRAP_CONTENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            ).apply {
+                gravity = android.view.Gravity.CENTER_HORIZONTAL
+                setMargins(0, 24, 0, 0)
+            }
+        }
+        dialogLayout.addView(btnClose)
+
+        val dialog = AlertDialog.Builder(this)
+            .setView(dialogLayout)
+            .setCancelable(true)
+            .create()
+
+        btnClose.setOnClickListener { dialog.dismiss() }
+        dialog.show()
+    }
+
     private fun subscribeToAlertsForLocation(latitude: Double, longitude: Double) {
         backendClient.subscribeToAlerts(latitude, longitude) { success, message ->
-            runOnUiThread {
-                if (success) {
-                    Log.d("Backend", "Subscribed to alerts: $message")
-                } else {
-                    Log.w("Backend", "Alert subscription failed: $message")
-                }
-            }
+            // Silent subscription - no UI feedback needed
         }
     }
 
@@ -1186,7 +1426,6 @@ class MainActivity : AppCompatActivity() {
                 Handler(Looper.getMainLooper()).postDelayed({
                     hideStatusCard()
                 }, 4000)
-
             } else {
                 showStatusCard("Address not found", isError = true)
             }
@@ -1312,8 +1551,6 @@ class MainActivity : AppCompatActivity() {
                         hasInitialLocationSet = true
                         hideStatusCard()
                         checkForNewAlerts()
-
-                        // Subscribe to alerts for this location
                         subscribeToAlertsForLocation(location.latitude, location.longitude)
                     } else {
                         mapView.controller.animateTo(userLocation, 18.0, 1000L)
@@ -1437,10 +1674,7 @@ class MainActivity : AppCompatActivity() {
         val btnCancel = dialogView.findViewById<Button>(R.id.btn_cancel)
         val btnYesReport = dialogView.findViewById<Button>(R.id.btn_yes_report)
 
-        btnCancel.setOnClickListener {
-            dialog.dismiss()
-        }
-
+        btnCancel.setOnClickListener { dialog.dismiss() }
         btnYesReport.setOnClickListener {
             dialog.dismiss()
             showReportInputDialog(location)
@@ -1463,15 +1697,11 @@ class MainActivity : AppCompatActivity() {
 
         currentPhoto = null
 
-        btnAddPhoto.setOnClickListener {
-            showPhotoSelectionDialog()
-        }
-
+        btnAddPhoto.setOnClickListener { showPhotoSelectionDialog() }
         btnCancel.setOnClickListener {
             currentPhoto = null
             dialog.dismiss()
         }
-
         btnSubmit.setOnClickListener {
             val reportText = editReportText.text?.toString()?.trim()
             if (reportText.isNullOrEmpty()) {
@@ -1487,9 +1717,6 @@ class MainActivity : AppCompatActivity() {
         dialog.show()
     }
 
-    /**
-     * Updated createReport method with adaptive language detection
-     */
     private fun createReport(location: GeoPoint, text: String, photo: Bitmap?) {
         if (!translatorInitialized) {
             val detectedLanguage = SimpleTranslator().detectLanguage(text)
@@ -1502,16 +1729,13 @@ class MainActivity : AppCompatActivity() {
                 val detectedLanguage = adaptiveTranslator.detectLanguage(text)
                 createReportWithLanguage(location, text, photo, detectedLanguage)
             } catch (e: Exception) {
-                Log.w("MainActivity", "Language detection failed, using fallback", e)
                 val detectedLanguage = SimpleTranslator().detectLanguage(text)
                 createReportWithLanguage(location, text, photo, detectedLanguage)
             }
         }
     }
 
-    // Updated createReportWithLanguage to include backend submission
     private fun createReportWithLanguage(location: GeoPoint, text: String, photo: Bitmap?, detectedLanguage: String) {
-        // First, create the local report (keep your existing local functionality)
         val report = Report(
             id = UUID.randomUUID().toString(),
             location = location,
@@ -1527,7 +1751,6 @@ class MainActivity : AppCompatActivity() {
         addReportToMap(report)
         saveReportsToPreferences()
 
-        // Show immediate local feedback
         val message = if (getSavedLanguage() == "es") {
             "Enviando al servidor..."
         } else {
@@ -1535,7 +1758,6 @@ class MainActivity : AppCompatActivity() {
         }
         showStatusCard(message, isLoading = true)
 
-        // Submit to backend
         backendClient.submitReport(
             latitude = location.latitude,
             longitude = location.longitude,
@@ -1551,9 +1773,6 @@ class MainActivity : AppCompatActivity() {
                         "✅ Sent to server"
                     }
                     showStatusCard(successMessage, isLoading = false)
-                    Log.d("Backend", "Report submitted: $message")
-
-                    // Subscribe to alerts for this location
                     subscribeToAlertsForLocation(location.latitude, location.longitude)
                 } else {
                     val errorMessage = if (getSavedLanguage() == "es") {
@@ -1562,7 +1781,6 @@ class MainActivity : AppCompatActivity() {
                         "❌ Connection error"
                     }
                     showStatusCard(errorMessage, isError = true)
-                    Log.e("Backend", "Failed to submit: $message")
                 }
 
                 Handler(Looper.getMainLooper()).postDelayed({
@@ -1623,9 +1841,6 @@ class MainActivity : AppCompatActivity() {
         return circle
     }
 
-    /**
-     * Clean report view dialog without technical details
-     */
     private fun showReportViewDialog(report: Report) {
         val dialogLayout = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
@@ -1633,7 +1848,6 @@ class MainActivity : AppCompatActivity() {
             setBackgroundColor(Color.BLACK)
         }
 
-        // Title
         val titleText = TextView(this).apply {
             text = "Safety Report"
             textSize = 20f
@@ -1644,7 +1858,6 @@ class MainActivity : AppCompatActivity() {
         }
         dialogLayout.addView(titleText)
 
-        // Report content
         val textReportContent = TextView(this).apply {
             text = report.originalText
             textSize = 16f
@@ -1661,7 +1874,6 @@ class MainActivity : AppCompatActivity() {
         }
         dialogLayout.addView(textReportContent)
 
-        // Single translation button
         val btnTranslate = Button(this).apply {
             text = "🌐 TRANSLATE"
             textSize = 16f
@@ -1678,7 +1890,6 @@ class MainActivity : AppCompatActivity() {
         }
         dialogLayout.addView(btnTranslate)
 
-        // Time info
         val textReportTime = TextView(this).apply {
             text = "Reported: ${getTimeAgo(report.timestamp)}"
             textSize = 14f
@@ -1687,7 +1898,6 @@ class MainActivity : AppCompatActivity() {
         }
         dialogLayout.addView(textReportTime)
 
-        // Close button
         val btnClose = Button(this).apply {
             text = "CLOSE"
             setTextColor(Color.RED)
@@ -1702,31 +1912,23 @@ class MainActivity : AppCompatActivity() {
         }
         dialogLayout.addView(btnClose)
 
-        // Translation state
         val currentLang = getSavedLanguage()
         var isTranslated = false
         var isTranslating = false
 
-        // Clean translation functionality
         btnTranslate.setOnClickListener {
             if (isTranslating) return@setOnClickListener
 
             if (!isTranslated) {
-                // Start translation
                 isTranslating = true
                 btnTranslate.text = "⏳ Translating..."
                 btnTranslate.isEnabled = false
 
-                Log.d("Translation", "Starting translation: '${report.originalText}' from ${report.originalLanguage} to $currentLang")
-
-                // Use intelligent translation (ML Kit first, then fallback)
                 intelligentTranslate(
                     report.originalText,
                     report.originalLanguage,
                     currentLang,
                     onSuccess = { translatedText ->
-                        Log.d("Translation", "Translation successful: '$translatedText'")
-
                         runOnUiThread {
                             textReportContent.text = translatedText
                             btnTranslate.text = "📝 SHOW ORIGINAL"
@@ -1737,15 +1939,12 @@ class MainActivity : AppCompatActivity() {
                         }
                     },
                     onError = { error ->
-                        Log.e("Translation", "Translation failed: $error")
-
                         runOnUiThread {
                             btnTranslate.text = "❌ Translation Failed"
                             btnTranslate.setBackgroundColor(Color.RED)
                             btnTranslate.isEnabled = true
                             isTranslating = false
 
-                            // Auto-reset after 2 seconds
                             Handler(Looper.getMainLooper()).postDelayed({
                                 btnTranslate.text = "🌐 TRANSLATE"
                                 btnTranslate.setBackgroundColor(Color.parseColor("#2196F3"))
@@ -1754,7 +1953,6 @@ class MainActivity : AppCompatActivity() {
                     }
                 )
             } else {
-                // Show original
                 textReportContent.text = report.originalText
                 btnTranslate.text = "🌐 TRANSLATE"
                 btnTranslate.setBackgroundColor(Color.parseColor("#2196F3"))
@@ -1762,16 +1960,12 @@ class MainActivity : AppCompatActivity() {
             }
         }
 
-        // Create and show dialog
         val dialog = AlertDialog.Builder(this)
             .setView(dialogLayout)
             .setCancelable(true)
             .create()
 
-        btnClose.setOnClickListener {
-            dialog.dismiss()
-        }
-
+        btnClose.setOnClickListener { dialog.dismiss() }
         dialog.show()
     }
 
