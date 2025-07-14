@@ -114,7 +114,7 @@ data class Alert(
 class BackendClient {
     companion object {
 
-        private const val BACKEND_URL = "https://derrite-production.up.railway.app"
+        private const val BACKEND_URL = "https://backend-production-cfbe.up.railway.app"
     }
 
     private val client = OkHttpClient.Builder()
