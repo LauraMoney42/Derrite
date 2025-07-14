@@ -16,6 +16,12 @@
     <string name="location_permission_needed">Location permission needed</string>
     <string name="location_permission_required">Location permission is required</string>
 
+    <string name="translate_button">Translate</string>
+    <string name="show_original">Show original text</string>
+    <string name="report_sent_spanish">Report sent in Spanish</string>
+    <string name="report_sent_english">Report sent in English</string>
+    <string name="report_sent">Report sent</string>
+    <string name="now">Now</string>
     <!-- Search -->
     <string name="search">Search</string>
     <string name="search_address">Search address or place...</string>
@@ -89,6 +95,23 @@
 
     <string name="distance_feet">%1$d ft away</string>
     <string name="distance_miles">%1$s mi away</string>
+
+    <string name="initializing_translator">Initializing translation system...</string>
+    <string name="translation_ready">Translation system ready</string>
+    <string name="translation_error">Translation system error</string>
+    <string name="translating">Translating...</string>
+    <string name="translation_failed">Translation failed</string>
+    <string name="ai_translate">🤖 AI TRANSLATE</string>
+    <string name="smart_translate">⚡ SMART TRANSLATE</string>
+    <string name="basic_translate">📝 TRANSLATE</string>
+    <string name="translation_confidence">Translation confidence: %d%%</string>
+    <string name="translation_method_ai">AI Translation</string>
+    <string name="translation_method_smart">Smart Translation</string>
+    <string name="translation_method_keyword">Keyword Translation</string>
+    <string name="translation_method_hybrid">Hybrid Translation</string>
+    <string name="device_capability_high">High-end device with full AI support</string>
+    <string name="device_capability_mid">Mid-range device with smart translation</string>
+    <string name="device_capability_low">Entry-level device with basic translation</string>
 
     <!-- Instructions -->
     <string name="instruction_title">Anonymous Safety Reporting</string>

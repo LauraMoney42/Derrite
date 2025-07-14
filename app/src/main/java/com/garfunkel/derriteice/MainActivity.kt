@@ -1,5 +1,13 @@
 package com.garfunkel.derriteice
 
+import com.garfunkel.derriteice.translation.AdaptiveTranslator
+import com.garfunkel.derriteice.translation.DeviceCapabilityDetector
+import com.garfunkel.derriteice.translation.SimpleTranslator
+import kotlinx.coroutines.*
+import kotlin.coroutines.resume
+import kotlin.coroutines.resumeWithException
+import kotlin.coroutines.suspendCoroutine
+import android.graphics.Color
 import android.Manifest
 import android.animation.ObjectAnimator
 import android.app.AlertDialog
@@ -10,15 +18,17 @@ import android.content.pm.PackageManager
 import android.content.res.Configuration
 import android.graphics.Bitmap
 import android.graphics.Canvas
-import android.graphics.Color
 import android.location.Address
 import android.location.Geocoder
 import android.location.Location
+import android.net.ConnectivityManager
+import android.net.NetworkCapabilities
 import android.os.Build
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
 import android.text.TextWatcher
+import android.util.Log
 import android.view.LayoutInflater
 import android.view.View
 import android.view.animation.DecelerateInterpolator
@@ -47,14 +57,18 @@ import org.osmdroid.views.overlay.MapEventsOverlay
 import org.osmdroid.views.overlay.Marker
 import org.osmdroid.views.overlay.Polygon
 import java.io.IOException
+import java.text.SimpleDateFormat
+import java.util.Calendar
 import java.util.Locale
 import java.util.UUID
 import kotlin.math.*
 
+// Updated Report data class with translation support
 data class Report(
     val id: String,
     val location: GeoPoint,
-    val text: String,
+    val originalText: String,
+    val originalLanguage: String,
     val hasPhoto: Boolean,
     val photo: Bitmap?,
     val timestamp: Long,
@@ -64,7 +78,7 @@ data class Report(
 data class Alert(
     val id: String,
     val report: Report,
-    val distanceFromUser: Double, // in meters
+    val distanceFromUser: Double,
     val isViewed: Boolean = false,
     val timestamp: Long = System.currentTimeMillis()
 )
@@ -87,6 +101,11 @@ class MainActivity : AppCompatActivity() {
     private lateinit var geocoder: Geocoder
     private lateinit var preferences: SharedPreferences
 
+    // Adaptive translator system
+    private lateinit var adaptiveTranslator: AdaptiveTranslator
+    private var translatorInitialized = false
+    private var currentTranslationJob: Job? = null
+
     private var currentLocationMarker: Marker? = null
     private var currentSearchMarker: Marker? = null
     private var currentPhoto: Bitmap? = null
@@ -101,10 +120,10 @@ class MainActivity : AppCompatActivity() {
 
     private val LOCATION_PERMISSION_REQUEST = 1001
     private val CAMERA_PERMISSION_REQUEST = 1002
-    private val REPORT_RADIUS_METERS = 804.5 // 0.5 miles (hyper-local coverage)
+    private val REPORT_RADIUS_METERS = 804.5
     private val REPORT_DURATION_HOURS = 8L
-    private val ALERT_RADIUS_METERS = 1609.0 // 1 mile for alerts
-    private val ZIP_CODE_RADIUS_METERS = 8047.0 // ~5 miles (approximate zip code area)
+    private val ALERT_RADIUS_METERS = 1609.0
+    private val ZIP_CODE_RADIUS_METERS = 8047.0
 
     // Camera launcher for photo capture
     private val cameraLauncher = registerForActivityResult(
@@ -112,7 +131,7 @@ class MainActivity : AppCompatActivity() {
     ) { bitmap ->
         if (bitmap != null) {
             currentPhoto = stripPhotoMetadata(bitmap)
-            showStatusCard(getString(R.string.photo_added_anonymously), isLoading = false)
+            showStatusCard("Photo added anonymously", isLoading = false)
         }
     }
 
@@ -127,12 +146,12 @@ class MainActivity : AppCompatActivity() {
                 inputStream?.close()
                 if (bitmap != null) {
                     currentPhoto = stripPhotoMetadata(bitmap)
-                    showStatusCard(getString(R.string.photo_added_anonymously), isLoading = false)
+                    showStatusCard("Photo added anonymously", isLoading = false)
                 } else {
-                    showStatusCard(getString(R.string.failed_to_load_photo), isError = true)
+                    showStatusCard("Failed to load photo", isError = true)
                 }
             } catch (e: Exception) {
-                showStatusCard(getString(R.string.failed_to_load_photo), isError = true)
+                showStatusCard("Failed to load photo", isError = true)
             }
         }
     }
@@ -145,6 +164,9 @@ class MainActivity : AppCompatActivity() {
 
         // Load viewed alerts from preferences
         loadViewedAlerts()
+
+        // Load saved reports from preferences
+        loadSavedReports()
 
         // Set app language to Spanish by default (or user's saved preference)
         setAppLanguage(getSavedLanguage())
@@ -168,6 +190,9 @@ class MainActivity : AppCompatActivity() {
         setupBottomNavigation()
         setupSearchBar()
 
+        // Initialize translation system (silent, with background model downloads)
+        initializeTranslationSystem()
+
         // Auto-center on user location when app opens
         autoLocateOnStartup()
 
@@ -176,6 +201,236 @@ class MainActivity : AppCompatActivity() {
 
         // Start periodic alert checking
         startAlertChecker()
+    }
+
+    /**
+     * Clean initialization without testing popups
+     */
+    private fun initializeTranslationSystem() {
+        adaptiveTranslator = AdaptiveTranslator(this)
+
+        // Start background model downloads immediately
+        downloadMLKitModelsInBackground()
+
+        // Initialize adaptive translator in background (no status messages)
+        CoroutineScope(Dispatchers.Main).launch {
+            try {
+                val success = withContext(Dispatchers.IO) {
+                    adaptiveTranslator.initialize()
+                }
+
+                translatorInitialized = success
+
+                Log.d("Translation", "Translation system initialized: $success")
+
+                if (success) {
+                    val summary = adaptiveTranslator.getDeviceSummary()
+                    Log.d("Translation", "Device capability: $summary")
+                }
+
+            } catch (e: Exception) {
+                Log.e("Translation", "Failed to initialize translator", e)
+                translatorInitialized = false
+            }
+        }
+    }
+
+    /**
+     * Silent background ML Kit model downloader
+     */
+    private fun downloadMLKitModelsInBackground() {
+        Log.d("BackgroundDownload", "Starting background ML Kit model download...")
+
+        CoroutineScope(Dispatchers.IO).launch {
+            try {
+                // Check if we're on WiFi (don't use cellular data for model downloads)
+                val connectivityManager = getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
+                val isWiFi = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                    val network = connectivityManager.activeNetwork
+                    val capabilities = connectivityManager.getNetworkCapabilities(network)
+                    capabilities?.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) == true
+                } else {
+                    @Suppress("DEPRECATION")
+                    val networkInfo = connectivityManager.activeNetworkInfo
+                    networkInfo?.type == ConnectivityManager.TYPE_WIFI
+                }
+
+                if (!isWiFi) {
+                    Log.d("BackgroundDownload", "Not on WiFi, skipping model download to save data")
+                    return@launch
+                }
+
+                // Download Spanish ↔ English models
+                downloadTranslationModel(
+                    com.google.mlkit.nl.translate.TranslateLanguage.SPANISH,
+                    com.google.mlkit.nl.translate.TranslateLanguage.ENGLISH,
+                    "Spanish → English"
+                )
+
+                downloadTranslationModel(
+                    com.google.mlkit.nl.translate.TranslateLanguage.ENGLISH,
+                    com.google.mlkit.nl.translate.TranslateLanguage.SPANISH,
+                    "English → Spanish"
+                )
+
+            } catch (e: Exception) {
+                Log.w("BackgroundDownload", "Background download setup failed: ${e.message}")
+            }
+        }
+    }
+
+    /**
+     * Download a specific translation model
+     */
+    private suspend fun downloadTranslationModel(sourceLanguage: String, targetLanguage: String, description: String) {
+        try {
+            val options = com.google.mlkit.nl.translate.TranslatorOptions.Builder()
+                .setSourceLanguage(sourceLanguage)
+                .setTargetLanguage(targetLanguage)
+                .build()
+
+            val translator = com.google.mlkit.nl.translate.Translation.getClient(options)
+
+            // Download conditions - only on WiFi
+            val downloadConditions = com.google.mlkit.common.model.DownloadConditions.Builder()
+                .requireWifi()
+                .build()
+
+            // Use coroutines to make it awaitable
+            val downloadSuccess = withContext(Dispatchers.IO) {
+                try {
+                    val downloadTask = translator.downloadModelIfNeeded(downloadConditions)
+
+                    // Convert Task to coroutine
+                    suspendCancellableCoroutine<Boolean> { continuation ->
+                        downloadTask
+                            .addOnSuccessListener {
+                                Log.d("BackgroundDownload", "✅ $description model downloaded successfully")
+                                continuation.resume(true)
+                            }
+                            .addOnFailureListener { e ->
+                                Log.w("BackgroundDownload", "⚠️ $description model download failed: ${e.message}")
+                                continuation.resume(false)
+                            }
+                    }
+                } catch (e: Exception) {
+                    Log.w("BackgroundDownload", "❌ $description model download error: ${e.message}")
+                    false
+                }
+            }
+
+            // Test the model after download to ensure it's working
+            if (downloadSuccess) {
+                testTranslationModel(translator, description)
+            }
+
+        } catch (e: Exception) {
+            Log.w("BackgroundDownload", "Failed to setup $description model download: ${e.message}")
+        }
+    }
+
+    /**
+     * Test a translation model to ensure it's working
+     */
+    private fun testTranslationModel(translator: com.google.mlkit.nl.translate.Translator, description: String) {
+        translator.translate("test")
+            .addOnSuccessListener { result ->
+                Log.d("BackgroundDownload", "✅ $description model is working correctly")
+            }
+            .addOnFailureListener { e ->
+                Log.w("BackgroundDownload", "⚠️ $description model test failed: ${e.message}")
+            }
+    }
+
+    /**
+     * Extension function to convert Task to coroutine
+     */
+    private suspend fun <T> com.google.android.gms.tasks.Task<T>.await(): T {
+        return suspendCancellableCoroutine { continuation ->
+            addOnCompleteListener { task ->
+                if (task.exception != null) {
+                    continuation.resumeWithException(task.exception!!)
+                } else {
+                    continuation.resume(task.result)
+                }
+            }
+        }
+    }
+
+    /**
+     * Simplified intelligent translation without technical details
+     */
+    private fun intelligentTranslate(
+        text: String,
+        fromLang: String,
+        toLang: String,
+        onSuccess: (String) -> Unit,
+        onError: (String) -> Unit
+    ) {
+        // Try ML Kit first (models should be downloaded in background)
+        tryMLKitTranslation(text, fromLang, toLang,
+            onSuccess = { result ->
+                Log.d("IntelligentTranslate", "ML Kit translation successful")
+                onSuccess(result)
+            },
+            onFailure = { mlKitError ->
+                Log.w("IntelligentTranslate", "ML Kit failed, using keyword fallback: $mlKitError")
+
+                // Fall back to keyword translation
+                try {
+                    val keywordResult = SimpleTranslator().translateText(text, fromLang, toLang)
+                    Log.d("IntelligentTranslate", "Keyword translation successful")
+                    onSuccess(keywordResult)
+                } catch (e: Exception) {
+                    Log.e("IntelligentTranslate", "All translation methods failed: ${e.message}")
+                    onError("Translation unavailable")
+                }
+            }
+        )
+    }
+
+    /**
+     * Simplified ML Kit translation attempt
+     */
+    private fun tryMLKitTranslation(
+        text: String,
+        fromLang: String,
+        toLang: String,
+        onSuccess: (String) -> Unit,
+        onFailure: (String) -> Unit
+    ) {
+        try {
+            val sourceLanguage = if (fromLang == "es")
+                com.google.mlkit.nl.translate.TranslateLanguage.SPANISH
+            else com.google.mlkit.nl.translate.TranslateLanguage.ENGLISH
+
+            val targetLanguage = if (toLang == "es")
+                com.google.mlkit.nl.translate.TranslateLanguage.SPANISH
+            else com.google.mlkit.nl.translate.TranslateLanguage.ENGLISH
+
+            val options = com.google.mlkit.nl.translate.TranslatorOptions.Builder()
+                .setSourceLanguage(sourceLanguage)
+                .setTargetLanguage(targetLanguage)
+                .build()
+
+            val translator = com.google.mlkit.nl.translate.Translation.getClient(options)
+
+            // Try translation (models should be ready from background download)
+            translator.translate(text)
+                .addOnSuccessListener { translatedText ->
+                    if (translatedText.isNotEmpty()) {
+                        onSuccess(translatedText)
+                    } else {
+                        onFailure("Empty result")
+                    }
+                }
+                .addOnFailureListener { e ->
+                    onFailure(e.message ?: "Translation failed")
+                }
+
+        } catch (e: Exception) {
+            onFailure("Setup failed: ${e.message}")
+        }
     }
 
     // Alert System Implementation
@@ -189,8 +444,77 @@ class MainActivity : AppCompatActivity() {
         preferences.edit().putStringSet("viewed_alerts", viewedAlertIds).apply()
     }
 
+    // Report Persistence System
+    private fun loadSavedReports() {
+        try {
+            val reportsJson = preferences.getString("saved_reports", "[]")
+            val reportsList = parseReportsFromJson(reportsJson ?: "[]")
+
+            // Filter out expired reports
+            val currentTime = System.currentTimeMillis()
+            val validReports = reportsList.filter { it.expiresAt > currentTime }
+
+            activeReports.clear()
+            activeReports.addAll(validReports)
+
+            // Add reports to map after map is ready
+            Handler(Looper.getMainLooper()).postDelayed({
+                validReports.forEach { report ->
+                    addReportToMap(report)
+                }
+            }, 1000)
+
+        } catch (e: Exception) {
+            // If loading fails, start with empty list
+            activeReports.clear()
+        }
+    }
+
+    private fun saveReportsToPreferences() {
+        try {
+            val reportsJson = convertReportsToJson(activeReports)
+            preferences.edit().putString("saved_reports", reportsJson).apply()
+        } catch (e: Exception) {
+            // Handle save error silently
+        }
+    }
+
+    private fun parseReportsFromJson(json: String): List<Report> {
+        val reports = mutableListOf<Report>()
+        try {
+            val lines = json.split("|||")
+            for (line in lines) {
+                if (line.trim().isEmpty()) continue
+
+                val parts = line.split(":::")
+                if (parts.size >= 8) {
+                    val report = Report(
+                        id = parts[0],
+                        location = GeoPoint(parts[1].toDouble(), parts[2].toDouble()),
+                        originalText = parts[3],
+                        originalLanguage = parts[4],
+                        hasPhoto = parts[5].toBoolean(),
+                        photo = null,
+                        timestamp = parts[6].toLong(),
+                        expiresAt = parts[7].toLong()
+                    )
+                    reports.add(report)
+                }
+            }
+        } catch (e: Exception) {
+            // Return empty list if parsing fails
+        }
+        return reports
+    }
+
+    private fun convertReportsToJson(reports: List<Report>): String {
+        return reports.joinToString("|||") { report ->
+            "${report.id}:::${report.location.latitude}:::${report.location.longitude}:::${report.originalText}:::${report.originalLanguage}:::${report.hasPhoto}:::${report.timestamp}:::${report.expiresAt}"
+        }
+    }
+
     private fun calculateDistance(lat1: Double, lng1: Double, lat2: Double, lng2: Double): Double {
-        val earthRadius = 6371000.0 // Earth radius in meters
+        val earthRadius = 6371000.0
         val dLat = Math.toRadians(lat2 - lat1)
         val dLng = Math.toRadians(lng2 - lng1)
         val a = sin(dLat / 2) * sin(dLat / 2) +
@@ -204,14 +528,12 @@ class MainActivity : AppCompatActivity() {
         currentLocation?.let { location ->
             val newAlerts = mutableListOf<Alert>()
 
-            // Check all active reports for proximity to user
             for (report in activeReports) {
                 val distance = calculateDistance(
                     location.latitude, location.longitude,
                     report.location.latitude, report.location.longitude
                 )
 
-                // If report is within alert radius (and not the user's own report based on timing)
                 if (distance <= ZIP_CODE_RADIUS_METERS) {
                     val existingAlert = activeAlerts.find { it.report.id == report.id }
                     if (existingAlert == null) {
@@ -227,15 +549,13 @@ class MainActivity : AppCompatActivity() {
                 }
             }
 
-            // Update alerts button if there are unviewed alerts
             val hasUnviewed = activeAlerts.any { !it.isViewed && !viewedAlertIds.contains(it.report.id) }
             updateAlertsButtonColor(hasUnviewed)
 
-            // Show brief notification if new alerts were found
             if (newAlerts.isNotEmpty()) {
                 val unviewedNewAlerts = newAlerts.filter { !it.isViewed && !viewedAlertIds.contains(it.report.id) }
                 if (unviewedNewAlerts.isNotEmpty()) {
-                    showStatusCard(getString(R.string.new_alerts_found, unviewedNewAlerts.size), isLoading = false)
+                    showStatusCard("${unviewedNewAlerts.size} new alerts found", isLoading = false)
                     Handler(Looper.getMainLooper()).postDelayed({
                         hideStatusCard()
                     }, 3000)
@@ -248,12 +568,9 @@ class MainActivity : AppCompatActivity() {
         val alertCheckRunnable = object : Runnable {
             override fun run() {
                 checkForNewAlerts()
-                // Check for alerts every 2 minutes
                 Handler(Looper.getMainLooper()).postDelayed(this, 2 * 60 * 1000)
             }
         }
-
-        // Start alert checking after 10 seconds
         Handler(Looper.getMainLooper()).postDelayed(alertCheckRunnable, 10000)
     }
 
@@ -261,7 +578,7 @@ class MainActivity : AppCompatActivity() {
         currentLocation?.let { location ->
             showAlertsDialog(location)
         } ?: run {
-            showStatusCard(getString(R.string.location_needed_for_alerts), isError = true)
+            showStatusCard("Location needed for alerts", isError = true)
         }
     }
 
@@ -280,14 +597,10 @@ class MainActivity : AppCompatActivity() {
         val btnRefreshAlerts = dialogView.findViewById<Button>(R.id.btn_refresh_alerts)
         val btnMarkAllRead = dialogView.findViewById<Button>(R.id.btn_mark_all_read)
 
-        // Show loading initially
         loadingContainer.visibility = View.VISIBLE
         noAlertsContainer.visibility = View.GONE
-
-        // Initially hide Mark All Read button until we know if there are alerts
         btnMarkAllRead.visibility = View.GONE
 
-        // Get user's current area description
         updateLocationDescription(userLocation, textAlertLocation)
 
         btnCloseAlerts.setOnClickListener {
@@ -303,7 +616,6 @@ class MainActivity : AppCompatActivity() {
             loadAlertsIntoDialog(alertsContainer, noAlertsContainer, loadingContainer, userLocation)
         }
 
-        // Load alerts after a short delay to show loading state
         Handler(Looper.getMainLooper()).postDelayed({
             loadAlertsIntoDialog(alertsContainer, noAlertsContainer, loadingContainer, userLocation)
         }, 1000)
@@ -329,12 +641,12 @@ class MainActivity : AppCompatActivity() {
                         append(address.postalCode)
                     }
                 }
-                textView.text = getString(R.string.alerts_for_area, locationText.ifEmpty { getString(R.string.your_area) })
+                textView.text = "Alerts for ${locationText.ifEmpty { "your area" }}"
             } else {
-                textView.text = getString(R.string.alerts_for_your_area)
+                textView.text = "Alerts for your area"
             }
         } catch (e: IOException) {
-            textView.text = getString(R.string.alerts_for_your_area)
+            textView.text = "Alerts for your area"
         }
     }
 
@@ -344,7 +656,6 @@ class MainActivity : AppCompatActivity() {
         noAlertsContainer.visibility = View.GONE
         alertsContainer.removeAllViews()
 
-        // Hide Mark All Read button during loading
         currentAlertsDialog?.let { dialog ->
             val btnMarkAllRead = dialog.findViewById<Button>(R.id.btn_mark_all_read)
             btnMarkAllRead?.visibility = View.GONE
@@ -361,7 +672,6 @@ class MainActivity : AppCompatActivity() {
                                      loadingContainer: LinearLayout, userLocation: Location) {
         alertsContainer.removeAllViews()
 
-        // Filter alerts within ZIP code area, not viewed, and sort by distance
         val nearbyUnviewedAlerts = activeAlerts
             .filter { it.distanceFromUser <= ZIP_CODE_RADIUS_METERS }
             .filter { !viewedAlertIds.contains(it.report.id) }
@@ -369,16 +679,15 @@ class MainActivity : AppCompatActivity() {
 
         loadingContainer.visibility = View.GONE
 
-        // Get the dialog buttons
         currentAlertsDialog?.let { dialog ->
             val btnMarkAllRead = dialog.findViewById<Button>(R.id.btn_mark_all_read)
 
             if (nearbyUnviewedAlerts.isEmpty()) {
                 noAlertsContainer.visibility = View.VISIBLE
-                btnMarkAllRead?.visibility = View.GONE  // Hide button when no alerts
+                btnMarkAllRead?.visibility = View.GONE
             } else {
                 noAlertsContainer.visibility = View.GONE
-                btnMarkAllRead?.visibility = View.VISIBLE  // Show button when alerts exist
+                btnMarkAllRead?.visibility = View.VISIBLE
 
                 for (alert in nearbyUnviewedAlerts) {
                     val alertItemView = createAlertItemView(alert)
@@ -400,18 +709,13 @@ class MainActivity : AppCompatActivity() {
         val btnViewOnMap = alertView.findViewById<Button>(R.id.btn_view_on_map)
         val btnViewDetails = alertView.findViewById<Button>(R.id.btn_view_details)
 
-        // Set content
         textAlertDistance.text = formatDistance(alert.distanceFromUser)
         textAlertTime.text = getTimeAgo(alert.report.timestamp)
-        textAlertContent.text = alert.report.text
+        textAlertContent.text = alert.report.originalText
 
-        // Show photo indicator if report has photo
         photoIndicator.visibility = if (alert.report.hasPhoto) View.VISIBLE else View.GONE
-
-        // Always show new badge since we're only showing unviewed alerts
         newAlertBadge.visibility = View.VISIBLE
 
-        // Button actions
         btnViewOnMap.setOnClickListener {
             currentAlertsDialog?.dismiss()
             showReportOnMap(alert.report)
@@ -441,17 +745,13 @@ class MainActivity : AppCompatActivity() {
     private fun showReportOnMap(report: Report) {
         mapView.controller.animateTo(report.location, 18.0, 1000L)
 
-        // Find and highlight the report marker
         val reportMarker = reportMarkers.find { marker ->
             marker.position.latitude == report.location.latitude &&
                     marker.position.longitude == report.location.longitude
         }
 
         reportMarker?.let { marker ->
-            // Show info bubble for the marker
             marker.showInfoWindow()
-
-            // Optional: Add a pulse animation to draw attention
             ObjectAnimator.ofFloat(marker, "alpha", 1f, 0.5f, 1f).apply {
                 duration = 1000
                 repeatCount = 2
@@ -464,11 +764,9 @@ class MainActivity : AppCompatActivity() {
         viewedAlertIds.add(reportId)
         saveViewedAlerts()
 
-        // Update alerts button color
         val hasUnviewed = activeAlerts.any { !viewedAlertIds.contains(it.report.id) }
         updateAlertsButtonColor(hasUnviewed)
 
-        // Refresh the alerts dialog if it's currently open
         currentAlertsDialog?.let { dialog ->
             if (dialog.isShowing) {
                 currentLocation?.let { location ->
@@ -495,9 +793,9 @@ class MainActivity : AppCompatActivity() {
         updateAlertsButtonColor(false)
     }
 
-    // Rest of the existing code...
+    // Language and preference management
     private fun getSavedLanguage(): String {
-        return preferences.getString("app_language", "es") ?: "es" // Default to Spanish on first run
+        return preferences.getString("app_language", "es") ?: "es"
     }
 
     private fun saveLanguage(languageCode: String) {
@@ -521,10 +819,7 @@ class MainActivity : AppCompatActivity() {
         saveLanguage(newLang)
         setAppLanguage(newLang)
 
-        // Mark that this is a language change recreation
         preferences.edit().putBoolean("is_language_change", true).apply()
-
-        // Recreate activity to apply language changes
         recreate()
     }
 
@@ -551,7 +846,6 @@ class MainActivity : AppCompatActivity() {
 
         btnSettings.setOnClickListener {
             animateButtonPress(btnSettings)
-            // TODO: Open settings activity when ready
         }
 
         btnAlerts.setOnClickListener {
@@ -559,7 +853,6 @@ class MainActivity : AppCompatActivity() {
             openAlertsScreen()
         }
 
-        // Initialize alerts button color
         updateAlertsButtonColor(false)
     }
 
@@ -574,24 +867,21 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun setupSearchBar() {
-        // Search button click
         btnSearch.setOnClickListener {
             animateButtonPress(btnSearch)
             val query = searchBar.text?.toString()?.trim()
             if (!query.isNullOrEmpty()) {
                 searchAddress(query)
             } else {
-                showStatusCard(getString(R.string.please_enter_address), isError = true)
+                showStatusCard("Please enter an address", isError = true)
             }
         }
 
-        // Clear search button
         btnClearSearch.setOnClickListener {
             animateButtonPress(btnClearSearch)
             clearSearch()
         }
 
-        // Handle Enter key on search bar
         searchBar.setOnEditorActionListener { _, actionId, _ ->
             if (actionId == android.view.inputmethod.EditorInfo.IME_ACTION_SEARCH) {
                 val query = searchBar.text?.toString()?.trim()
@@ -604,7 +894,6 @@ class MainActivity : AppCompatActivity() {
             }
         }
 
-        // Show/hide clear button based on text
         searchBar.addTextChangedListener(object : TextWatcher {
             override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
             override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {}
@@ -615,42 +904,35 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun searchAddress(query: String) {
-        showStatusCard(getString(R.string.searching_address), isLoading = true)
+        showStatusCard("Searching for address...", isLoading = true)
 
-        // Hide keyboard
         val inputMethodManager = getSystemService(Context.INPUT_METHOD_SERVICE) as android.view.inputmethod.InputMethodManager
         inputMethodManager.hideSoftInputFromWindow(searchBar.windowToken, 0)
 
         try {
-            // Use geocoder to find address
             val addresses: List<Address>? = geocoder.getFromLocationName(query, 1)
 
             if (!addresses.isNullOrEmpty()) {
                 val address = addresses[0]
                 val location = GeoPoint(address.latitude, address.longitude)
 
-                // Animate to searched location
                 mapView.controller.animateTo(location, 16.0, 1000L)
-
-                // Add a temporary marker for the search result
                 addSearchResultMarker(location, address)
 
-                // Show success message with found address
                 val foundAddress = getFormattedAddress(address)
-                showStatusCard(getString(R.string.found_address, foundAddress), isLoading = false)
+                showStatusCard("Found: $foundAddress", isLoading = false)
 
-                // Auto-hide status after 4 seconds
                 Handler(Looper.getMainLooper()).postDelayed({
                     hideStatusCard()
                 }, 4000)
 
             } else {
-                showStatusCard(getString(R.string.address_not_found), isError = true)
+                showStatusCard("Address not found", isError = true)
             }
         } catch (e: IOException) {
-            showStatusCard(getString(R.string.search_error), isError = true)
+            showStatusCard("Search error", isError = true)
         } catch (e: Exception) {
-            showStatusCard(getString(R.string.search_error), isError = true)
+            showStatusCard("Search error", isError = true)
         }
     }
 
@@ -658,7 +940,6 @@ class MainActivity : AppCompatActivity() {
         searchBar.text?.clear()
         btnClearSearch.visibility = View.GONE
 
-        // Remove search result marker if it exists
         currentSearchMarker?.let { marker ->
             mapView.overlays.remove(marker)
             currentSearchMarker = null
@@ -697,7 +978,6 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun addSearchResultMarker(location: GeoPoint, address: Address) {
-        // Remove previous search marker
         currentSearchMarker?.let { marker ->
             mapView.overlays.remove(marker)
         }
@@ -706,10 +986,9 @@ class MainActivity : AppCompatActivity() {
             position = location
             setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_BOTTOM)
             icon = ContextCompat.getDrawable(this@MainActivity, R.drawable.ic_search_marker)
-            title = getString(R.string.search_result)
+            title = "Search Result"
             snippet = getFormattedAddress(address)
 
-            // Add entrance animation
             alpha = 0f
             ObjectAnimator.ofFloat(this, "alpha", 0f, 1f).apply {
                 duration = 500
@@ -723,7 +1002,6 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun setupMap() {
-        // Professional map configuration
         mapView.apply {
             setTileSource(TileSourceFactory.MAPNIK)
             setMultiTouchControls(true)
@@ -731,34 +1009,32 @@ class MainActivity : AppCompatActivity() {
             setFlingEnabled(true)
         }
 
-        // Set default location (will be overridden by auto-location)
-        val defaultPoint = GeoPoint(40.7128, -74.0060) // NYC fallback
+        val defaultPoint = GeoPoint(40.7128, -74.0060)
         mapView.controller.setZoom(15.0)
         mapView.controller.setCenter(defaultPoint)
 
-        // Add long press listener for reporting
         setupMapLongPressListener()
     }
 
     private fun autoLocateOnStartup() {
-        // Check if this is a recreation due to language change
         val isLanguageChange = preferences.getBoolean("is_language_change", false)
         if (isLanguageChange) {
-            // Clear the flag and skip location popup
             preferences.edit().putBoolean("is_language_change", false).apply()
             if (hasLocationPermission()) {
                 getCurrentLocationSilently(isStartup = true)
             }
-            return
+        } else {
+            if (hasLocationPermission()) {
+                showStatusCard("Finding your location...", isLoading = true)
+                getCurrentLocationSilently(isStartup = true)
+            } else {
+                hideStatusCard()
+            }
         }
 
-        if (hasLocationPermission()) {
-            showStatusCard(getString(R.string.finding_location), isLoading = true)
-            getCurrentLocationSilently(isStartup = true)
-        } else {
-            // If no permission, just keep the default map location
-            hideStatusCard()
-        }
+        Handler(Looper.getMainLooper()).postDelayed({
+            checkForNewAlerts()
+        }, 2000)
     }
 
     private fun getCurrentLocationSilently(isStartup: Boolean = false) {
@@ -769,54 +1045,46 @@ class MainActivity : AppCompatActivity() {
                     val userLocation = GeoPoint(location.latitude, location.longitude)
 
                     if (isStartup && !hasInitialLocationSet) {
-                        // First time - center map on user location with closer zoom AND show marker
                         mapView.controller.setCenter(userLocation)
-                        mapView.controller.setZoom(18.0) // Closer zoom for better detail
-                        addLocationMarker(userLocation) // Add blue marker immediately on startup
+                        mapView.controller.setZoom(18.0)
+                        addLocationMarker(userLocation)
                         hasInitialLocationSet = true
                         hideStatusCard()
-
-                        // Check for alerts once we have location
                         checkForNewAlerts()
                     } else {
-                        // Manual location button press - animate and show address
                         mapView.controller.animateTo(userLocation, 18.0, 1000L)
                         addLocationMarker(userLocation)
                         showLocationAddress(location)
-
-                        // Check for alerts when location updates
                         checkForNewAlerts()
                     }
                 } else {
                     if (isStartup) {
                         hideStatusCard()
                     } else {
-                        showStatusCard(getString(R.string.unable_to_get_location), isError = true)
+                        showStatusCard("Unable to get location", isError = true)
                     }
                 }
             }.addOnFailureListener {
                 if (isStartup) {
                     hideStatusCard()
                 } else {
-                    showStatusCard(getString(R.string.location_error), isError = true)
+                    showStatusCard("Location error", isError = true)
                 }
             }
         } catch (e: SecurityException) {
             if (!isStartup) {
-                showStatusCard(getString(R.string.location_permission_needed), isError = true)
+                showStatusCard("Location permission needed", isError = true)
             }
         }
     }
 
     private fun showLocationAddress(location: Location) {
-        // Try to get address from coordinates
         try {
             val addresses: List<Address>? = geocoder.getFromLocation(location.latitude, location.longitude, 1)
 
             if (!addresses.isNullOrEmpty()) {
                 val address = addresses[0]
                 val locationText = buildString {
-                    // Try to build a nice address string
                     if (!address.thoroughfare.isNullOrEmpty()) {
                         append(address.thoroughfare)
                         if (!address.subThoroughfare.isNullOrEmpty()) {
@@ -836,25 +1104,21 @@ class MainActivity : AppCompatActivity() {
                         append(address.adminArea)
                     }
 
-                    // If we couldn't build a nice address, fall back to coordinates
                     if (isEmpty()) {
                         append("${String.format("%.4f", location.latitude)}, ${String.format("%.4f", location.longitude)}")
                     }
                 }
 
-                showStatusCard(getString(R.string.you_are_at, locationText), isLoading = false)
+                showStatusCard("You are at: $locationText", isLoading = false)
             } else {
-                // Fallback to coordinates if geocoding fails
                 val coords = "${String.format("%.4f", location.latitude)}, ${String.format("%.4f", location.longitude)}"
-                showStatusCard(getString(R.string.you_are_at, coords), isLoading = false)
+                showStatusCard("You are at: $coords", isLoading = false)
             }
         } catch (e: IOException) {
-            // Geocoding failed, show coordinates
             val coords = "${String.format("%.4f", location.latitude)}, ${String.format("%.4f", location.longitude)}"
-            showStatusCard(getString(R.string.you_are_at, coords), isLoading = false)
+            showStatusCard("You are at: $coords", isLoading = false)
         }
 
-        // Auto-hide status after 5 seconds
         Handler(Looper.getMainLooper()).postDelayed({
             hideStatusCard()
         }, 5000)
@@ -875,7 +1139,7 @@ class MainActivity : AppCompatActivity() {
         }
 
         val mapEventsOverlay = MapEventsOverlay(mapEventsReceiver)
-        mapView.overlays.add(0, mapEventsOverlay) // Add as first overlay
+        mapView.overlays.add(0, mapEventsOverlay)
     }
 
     private fun setupLocationButton() {
@@ -892,7 +1156,6 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun setupInstructionOverlay() {
-        // Auto-hide instruction after 10 seconds
         Handler(Looper.getMainLooper()).postDelayed({
             if (instructionOverlay.visibility == View.VISIBLE) {
                 instructionOverlay.visibility = View.GONE
@@ -934,7 +1197,6 @@ class MainActivity : AppCompatActivity() {
         val btnCancel = dialogView.findViewById<Button>(R.id.btn_cancel)
         val btnSubmit = dialogView.findViewById<Button>(R.id.btn_submit)
 
-        // Reset photo for new report
         currentPhoto = null
 
         btnAddPhoto.setOnClickListener {
@@ -949,7 +1211,7 @@ class MainActivity : AppCompatActivity() {
         btnSubmit.setOnClickListener {
             val reportText = editReportText.text?.toString()?.trim()
             if (reportText.isNullOrEmpty()) {
-                showStatusCard(getString(R.string.please_enter_description), isError = true)
+                showStatusCard("Please enter a description", isError = true)
                 return@setOnClickListener
             }
 
@@ -961,11 +1223,34 @@ class MainActivity : AppCompatActivity() {
         dialog.show()
     }
 
+    /**
+     * Updated createReport method with adaptive language detection
+     */
     private fun createReport(location: GeoPoint, text: String, photo: Bitmap?) {
+        if (!translatorInitialized) {
+            val detectedLanguage = SimpleTranslator().detectLanguage(text)
+            createReportWithLanguage(location, text, photo, detectedLanguage)
+            return
+        }
+
+        CoroutineScope(Dispatchers.Main).launch {
+            try {
+                val detectedLanguage = adaptiveTranslator.detectLanguage(text)
+                createReportWithLanguage(location, text, photo, detectedLanguage)
+            } catch (e: Exception) {
+                Log.w("MainActivity", "Language detection failed, using fallback", e)
+                val detectedLanguage = SimpleTranslator().detectLanguage(text)
+                createReportWithLanguage(location, text, photo, detectedLanguage)
+            }
+        }
+    }
+
+    private fun createReportWithLanguage(location: GeoPoint, text: String, photo: Bitmap?, detectedLanguage: String) {
         val report = Report(
             id = UUID.randomUUID().toString(),
             location = location,
-            text = text,
+            originalText = text,
+            originalLanguage = detectedLanguage,
             hasPhoto = photo != null,
             photo = photo,
             timestamp = System.currentTimeMillis(),
@@ -974,40 +1259,49 @@ class MainActivity : AppCompatActivity() {
 
         activeReports.add(report)
         addReportToMap(report)
+        saveReportsToPreferences()
 
-        showStatusCard(getString(R.string.report_created), isLoading = false)
+        val message = if (getSavedLanguage() == "es") {
+            when (detectedLanguage) {
+                "es" -> "Reporte enviado en español"
+                "en" -> "Reporte enviado en inglés"
+                else -> "Reporte enviado"
+            }
+        } else {
+            when (detectedLanguage) {
+                "es" -> "Report sent in Spanish"
+                "en" -> "Report sent in English"
+                else -> "Report sent"
+            }
+        }
 
-        // Auto-hide status after 3 seconds
+        showStatusCard(message, isLoading = false)
+
         Handler(Looper.getMainLooper()).postDelayed({
             hideStatusCard()
         }, 3000)
 
-        // Check for new alerts after creating a report (for other users' areas)
         Handler(Looper.getMainLooper()).postDelayed({
             checkForNewAlerts()
         }, 5000)
     }
 
     private fun addReportToMap(report: Report) {
-        // Create red circle overlay (0.5-mile radius)
         val circle = createReportCircle(report.location)
         mapView.overlays.add(circle)
         reportCircles.add(circle)
 
-        // Create report marker
         val marker = Marker(mapView).apply {
             position = report.location
             setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_BOTTOM)
             icon = ContextCompat.getDrawable(this@MainActivity, R.drawable.ic_report_marker)
-            title = getString(R.string.safety_report)
+            title = "Safety Report"
 
-            // Handle marker tap to show report details
             setOnMarkerClickListener { _, _ ->
                 showReportViewDialog(report)
                 true
             }
 
-            // Add entrance animation
             alpha = 0f
             ObjectAnimator.ofFloat(this, "alpha", 0f, 1f).apply {
                 duration = 500
@@ -1024,9 +1318,8 @@ class MainActivity : AppCompatActivity() {
     private fun createReportCircle(center: GeoPoint): Polygon {
         val circle = Polygon()
 
-        // Create circle points (0.5-mile radius)
         val points = mutableListOf<GeoPoint>()
-        val earthRadius = 6371000.0 // Earth radius in meters
+        val earthRadius = 6371000.0
         val radiusInDegrees = REPORT_RADIUS_METERS / earthRadius * (180.0 / Math.PI)
 
         for (i in 0..360 step 10) {
@@ -1037,36 +1330,157 @@ class MainActivity : AppCompatActivity() {
         }
 
         circle.points = points
-        circle.fillColor = Color.parseColor("#20FF0000") // Translucent red for reports
-        circle.strokeColor = Color.parseColor("#80FF0000") // Semi-transparent red ring for reports
+        circle.fillColor = Color.parseColor("#20FF0000")
+        circle.strokeColor = Color.parseColor("#80FF0000")
         circle.strokeWidth = 3f
 
         return circle
     }
 
+    /**
+     * Clean report view dialog without technical details
+     */
     private fun showReportViewDialog(report: Report) {
-        val dialogView = layoutInflater.inflate(R.layout.dialog_view_report, null)
+        val dialogLayout = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(48, 48, 48, 48)
+            setBackgroundColor(Color.BLACK)
+        }
+
+        // Title
+        val titleText = TextView(this).apply {
+            text = "Safety Report"
+            textSize = 20f
+            setTextColor(Color.WHITE)
+            gravity = android.view.Gravity.CENTER
+            setPadding(0, 0, 0, 32)
+            setTypeface(null, android.graphics.Typeface.BOLD)
+        }
+        dialogLayout.addView(titleText)
+
+        // Report content
+        val textReportContent = TextView(this).apply {
+            text = report.originalText
+            textSize = 16f
+            setTextColor(Color.WHITE)
+            setPadding(16, 16, 16, 32)
+            setBackgroundColor(Color.parseColor("#333333"))
+
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            ).apply {
+                setMargins(0, 0, 0, 16)
+            }
+        }
+        dialogLayout.addView(textReportContent)
+
+        // Single translation button
+        val btnTranslate = Button(this).apply {
+            text = "🌐 TRANSLATE"
+            textSize = 16f
+            setBackgroundColor(Color.parseColor("#2196F3"))
+            setTextColor(Color.WHITE)
+            setPadding(32, 24, 32, 24)
+
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            ).apply {
+                setMargins(0, 0, 0, 32)
+            }
+        }
+        dialogLayout.addView(btnTranslate)
+
+        // Time info
+        val textReportTime = TextView(this).apply {
+            text = "Reported: ${getTimeAgo(report.timestamp)}"
+            textSize = 14f
+            setTextColor(Color.WHITE)
+            setPadding(0, 0, 0, 32)
+        }
+        dialogLayout.addView(textReportTime)
+
+        // Close button
+        val btnClose = Button(this).apply {
+            text = "CLOSE"
+            setTextColor(Color.RED)
+            setBackgroundColor(Color.TRANSPARENT)
+
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.WRAP_CONTENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            ).apply {
+                gravity = android.view.Gravity.CENTER_HORIZONTAL
+            }
+        }
+        dialogLayout.addView(btnClose)
+
+        // Translation state
+        val currentLang = getSavedLanguage()
+        var isTranslated = false
+        var isTranslating = false
+
+        // Clean translation functionality
+        btnTranslate.setOnClickListener {
+            if (isTranslating) return@setOnClickListener
+
+            if (!isTranslated) {
+                // Start translation
+                isTranslating = true
+                btnTranslate.text = "⏳ Translating..."
+                btnTranslate.isEnabled = false
+
+                Log.d("Translation", "Starting translation: '${report.originalText}' from ${report.originalLanguage} to $currentLang")
+
+                // Use intelligent translation (ML Kit first, then fallback)
+                intelligentTranslate(
+                    report.originalText,
+                    report.originalLanguage,
+                    currentLang,
+                    onSuccess = { translatedText ->
+                        Log.d("Translation", "Translation successful: '$translatedText'")
+
+                        runOnUiThread {
+                            textReportContent.text = translatedText
+                            btnTranslate.text = "📝 SHOW ORIGINAL"
+                            btnTranslate.setBackgroundColor(Color.parseColor("#4CAF50"))
+                            btnTranslate.isEnabled = true
+                            isTranslated = true
+                            isTranslating = false
+                        }
+                    },
+                    onError = { error ->
+                        Log.e("Translation", "Translation failed: $error")
+
+                        runOnUiThread {
+                            btnTranslate.text = "❌ Translation Failed"
+                            btnTranslate.setBackgroundColor(Color.RED)
+                            btnTranslate.isEnabled = true
+                            isTranslating = false
+
+                            // Auto-reset after 2 seconds
+                            Handler(Looper.getMainLooper()).postDelayed({
+                                btnTranslate.text = "🌐 TRANSLATE"
+                                btnTranslate.setBackgroundColor(Color.parseColor("#2196F3"))
+                            }, 2000)
+                        }
+                    }
+                )
+            } else {
+                // Show original
+                textReportContent.text = report.originalText
+                btnTranslate.text = "🌐 TRANSLATE"
+                btnTranslate.setBackgroundColor(Color.parseColor("#2196F3"))
+                isTranslated = false
+            }
+        }
+
+        // Create and show dialog
         val dialog = AlertDialog.Builder(this)
-            .setView(dialogView)
+            .setView(dialogLayout)
             .setCancelable(true)
             .create()
-
-        val textReportContent = dialogView.findViewById<TextView>(R.id.text_report_content)
-        val imageReportPhoto = dialogView.findViewById<ImageView>(R.id.image_report_photo)
-        val textReportTime = dialogView.findViewById<TextView>(R.id.text_report_time)
-        val btnClose = dialogView.findViewById<Button>(R.id.btn_close)
-
-        // Set report content
-        textReportContent.text = report.text
-        textReportTime.text = getString(R.string.reported_time, getTimeAgo(report.timestamp))
-
-        // Show photo if available
-        if (report.hasPhoto && report.photo != null) {
-            imageReportPhoto.setImageBitmap(report.photo)
-            imageReportPhoto.visibility = View.VISIBLE
-        } else {
-            imageReportPhoto.visibility = View.GONE
-        }
 
         btnClose.setOnClickListener {
             dialog.dismiss()
@@ -1081,29 +1495,26 @@ class MainActivity : AppCompatActivity() {
                 val currentTime = System.currentTimeMillis()
                 val expiredReports = activeReports.filter { it.expiresAt < currentTime }
 
-                expiredReports.forEach { report ->
-                    removeReportFromMap(report)
-                    activeReports.remove(report)
-
-                    // Also remove from alerts
-                    activeAlerts.removeAll { it.report.id == report.id }
+                if (expiredReports.isNotEmpty()) {
+                    expiredReports.forEach { report ->
+                        removeReportFromMap(report)
+                        activeReports.remove(report)
+                        activeAlerts.removeAll { it.report.id == report.id }
+                    }
+                    saveReportsToPreferences()
                 }
 
-                // Update alerts button after cleanup
                 val hasUnviewed = activeAlerts.any { !viewedAlertIds.contains(it.report.id) }
                 updateAlertsButtonColor(hasUnviewed)
 
-                // Schedule next cleanup in 1 hour
                 Handler(Looper.getMainLooper()).postDelayed(this, 60 * 60 * 1000)
             }
         }
 
-        // Start cleanup timer (check every hour)
         Handler(Looper.getMainLooper()).postDelayed(cleanupRunnable, 60 * 60 * 1000)
     }
 
     private fun removeReportFromMap(report: Report) {
-        // Find and remove marker
         val markerToRemove = reportMarkers.find { marker ->
             marker.position.latitude == report.location.latitude &&
                     marker.position.longitude == report.location.longitude
@@ -1113,9 +1524,8 @@ class MainActivity : AppCompatActivity() {
             reportMarkers.remove(marker)
         }
 
-        // Find and remove circle
         if (reportCircles.isNotEmpty()) {
-            val circle = reportCircles.removeAt(0) // Remove oldest circle
+            val circle = reportCircles.removeAt(0)
             mapView.overlays.remove(circle)
         }
 
@@ -1130,24 +1540,24 @@ class MainActivity : AppCompatActivity() {
         val days = hours / 24
 
         return when {
-            minutes < 1 -> getString(R.string.just_now)
-            minutes < 60 -> getString(R.string.minutes_ago, minutes)
-            hours < 24 -> getString(R.string.hours_ago, hours)
-            else -> getString(R.string.days_ago, days)
+            minutes < 1 -> "Just now"
+            minutes < 60 -> "$minutes minutes ago"
+            hours < 24 -> "$hours hours ago"
+            else -> "$days days ago"
         }
     }
 
     private fun showPhotoSelectionDialog() {
-        val options = arrayOf(getString(R.string.take_photo), getString(R.string.choose_from_gallery))
+        val options = arrayOf("Take Photo", "Choose from Gallery")
         AlertDialog.Builder(this)
-            .setTitle(getString(R.string.add_photo))
+            .setTitle("Add Photo")
             .setItems(options) { _, which ->
                 when (which) {
                     0 -> requestCameraPermissionAndCapture()
                     1 -> photoPickerLauncher.launch("image/*")
                 }
             }
-            .setNegativeButton(getString(R.string.cancel), null)
+            .setNegativeButton("Cancel", null)
             .show()
     }
 
@@ -1198,7 +1608,7 @@ class MainActivity : AppCompatActivity() {
             return
         }
 
-        showStatusCard(getString(R.string.finding_location), isLoading = true)
+        showStatusCard("Finding your location...", isLoading = true)
         getCurrentLocationSilently(isStartup = false)
     }
 
@@ -1211,7 +1621,7 @@ class MainActivity : AppCompatActivity() {
             position = location
             setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_BOTTOM)
             icon = ContextCompat.getDrawable(this@MainActivity, R.drawable.ic_location_pin)
-            title = getString(R.string.your_location)
+            title = "Your Location"
 
             alpha = 0f
             ObjectAnimator.ofFloat(this, "alpha", 0f, 1f).apply {
@@ -1229,9 +1639,9 @@ class MainActivity : AppCompatActivity() {
         statusText.text = message
 
         val textColor = when {
-            isError -> ContextCompat.getColor(this, R.color.error)
-            isLoading -> ContextCompat.getColor(this, R.color.text_secondary)
-            else -> ContextCompat.getColor(this, R.color.success)
+            isError -> Color.RED
+            isLoading -> Color.parseColor("#888888")
+            else -> Color.parseColor("#4CAF50")
         }
         statusText.setTextColor(textColor)
 
@@ -1290,7 +1700,7 @@ class MainActivity : AppCompatActivity() {
                 LOCATION_PERMISSION_REQUEST
             )
         } else {
-            showStatusCard(getString(R.string.location_permission_needed), isError = true)
+            showStatusCard("Location permission needed", isError = true)
         }
     }
 
@@ -1306,14 +1716,14 @@ class MainActivity : AppCompatActivity() {
                 if (grantResults.isNotEmpty() && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
                     getCurrentLocation()
                 } else {
-                    showStatusCard(getString(R.string.location_permission_required), isError = true)
+                    showStatusCard("Location permission required", isError = true)
                 }
             }
             CAMERA_PERMISSION_REQUEST -> {
                 if (grantResults.isNotEmpty() && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
                     cameraLauncher.launch(null)
                 } else {
-                    showStatusCard(getString(R.string.camera_permission_needed), isError = true)
+                    showStatusCard("Camera permission needed", isError = true)
                 }
             }
         }
@@ -1331,6 +1741,12 @@ class MainActivity : AppCompatActivity() {
 
     override fun onDestroy() {
         super.onDestroy()
+
+        if (::adaptiveTranslator.isInitialized) {
+            adaptiveTranslator.cleanup()
+        }
+        currentTranslationJob?.cancel()
+
         mapView.onDetach()
         currentAlertsDialog?.dismiss()
     }

@@ -92,6 +92,11 @@ dependencies {
     androidTestImplementation("androidx.compose.ui:ui-test-junit4")
     debugImplementation("androidx.compose.ui:ui-tooling")
     debugImplementation("androidx.compose.ui:ui-test-manifest")
+    implementation ("com.google.mlkit:translate:17.0.1")
+    implementation ("com.google.mlkit:language-id:17.0.4")
+    // Coroutines (if not already included)
+    implementation ("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.6.4")
+    implementation ("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.6.4")
 
     implementation("androidx.coordinatorlayout:coordinatorlayout:1.2.0")
 }

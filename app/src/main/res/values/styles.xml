@@ -9,4 +9,12 @@
         <item name="strokeWidth">1dp</item>
     </style>
 
+    <!-- Dialog Style - Force dark colors -->
+    <style name="DialogStyle" parent="Theme.Material3.DayNight.Dialog">
+        <item name="android:windowBackground">#FF000000</item>
+        <item name="android:textColor">#FFFFFFFF</item>
+        <item name="colorSurface">#FF000000</item>
+        <item name="colorOnSurface">#FFFFFFFF</item>
+    </style>
+
 </resources>

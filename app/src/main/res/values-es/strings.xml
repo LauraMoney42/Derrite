@@ -28,6 +28,12 @@
     <string name="search_result">Resultado de Búsqueda</string>
     <string name="please_enter_address">Por favor ingresa una dirección</string>
 
+    <string name="translate_button">Traducir</string>
+    <string name="show_original">Mostrar texto original</string>
+    <string name="report_sent_spanish">Reporte enviado en español</string>
+    <string name="report_sent_english">Reporte enviado en inglés</string>
+    <string name="report_sent">Reporte enviado</string>
+    <string name="now">Ahora</string>
     <!-- Reports -->
     <string name="safety_report">Reporte de Seguridad</string>
     <string name="report_created">Reporte creado anónimamente</string>
@@ -87,6 +93,24 @@
     <string name="view_details">Ver Detalles</string>
     <string name="refresh">Actualizar</string>
     <string name="mark_all_read">Marcar Todas como Leídas</string>
+
+    <string name="initializing_translator">Inicializando sistema de traducción...</string>
+    <string name="translation_ready">Sistema de traducción listo</string>
+    <string name="translation_error">Error del sistema de traducción</string>
+    <string name="translating">Traduciendo...</string>
+    <string name="translation_failed">Falló la traducción</string>
+    <string name="ai_translate">🤖 TRADUCIR IA</string>
+    <string name="smart_translate">⚡ TRADUCIR INTELIGENTE</string>
+    <string name="basic_translate">📝 TRADUCIR</string>
+    <string name="translation_confidence">Confianza de traducción: %d%%</string>
+    <string name="translation_method_ai">Traducción IA</string>
+    <string name="translation_method_smart">Traducción Inteligente</string>
+    <string name="translation_method_keyword">Traducción por Palabras Clave</string>
+    <string name="translation_method_hybrid">Traducción Híbrida</string>
+    <string name="device_capability_high">Dispositivo de alta gama con soporte completo de IA</string>
+    <string name="device_capability_mid">Dispositivo de gama media con traducción inteligente</string>
+    <string name="device_capability_low">Dispositivo básico con traducción simple</string>
+
 
     <!-- Instructions -->
     <string name="instruction_title">Reportes Anónimos de Seguridad</string>

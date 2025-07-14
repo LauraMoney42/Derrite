@@ -23,7 +23,12 @@
     <color name="alert_red">#FF0000</color>
     <color name="white">#FFFFFF</color>
     <color name="black">#000000</color>
+    <color name="gray">#FF666666</color>
+    <color name="light_gray">#FFCCCCCC</color>
 
+    <!-- Optional: Colors for translation states -->
+    <color name="translation_accent">#FF2196F3</color>
+    <color name="original_text_accent">#FF757575</color>
     <!-- New Search UI Colors -->
     <color name="text_hint">#999999</color>
     <color name="icon_primary">#000000</color>
@@ -35,4 +40,6 @@
     <color name="search_background">#FFFFFF</color>
     <color name="search_hint">#999999</color>
     <color name="transparent">#00000000</color>
+    <color name="background_light">#1A1A1A</color>
+
 </resources>
