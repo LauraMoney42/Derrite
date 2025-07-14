@@ -1,6 +1,8 @@
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
+    id("com.google.gms.google-services")
+
 }
 
 android {
@@ -61,6 +63,21 @@ android {
 }
 
 dependencies {
+    // Firebase (use double quotes and parentheses for Kotlin DSL)
+    implementation("com.google.firebase:firebase-messaging:23.2.1")
+    implementation("com.google.firebase:firebase-bom:32.2.2")
+
+    // OkHttp
+    implementation("com.squareup.okhttp3:okhttp:4.11.0")
+
+    // Make sure you also have these
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.6.4")
+    implementation("androidx.core:core-ktx:1.10.1")
+    implementation("androidx.appcompat:appcompat:1.6.1")
+    implementation("com.google.android.material:material:1.9.0")
+    implementation("androidx.constraintlayout:constraintlayout:2.1.4")
+    
+    implementation(platform("com.google.firebase:firebase-bom:33.16.0"))
     implementation("androidx.core:core-ktx:1.12.0")
     implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.7.0")
     implementation("androidx.activity:activity-compose:1.8.2")
@@ -99,4 +116,6 @@ dependencies {
     implementation ("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.6.4")
 
     implementation("androidx.coordinatorlayout:coordinatorlayout:1.2.0")
+
+
 }

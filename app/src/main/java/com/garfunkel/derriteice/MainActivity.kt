@@ -1,12 +1,31 @@
 package com.garfunkel.derriteice
 
+// OkHttp imports
+import okhttp3.*
+import okhttp3.MediaType.Companion.toMediaType
+import okhttp3.RequestBody.Companion.toRequestBody
+import java.io.IOException
+import java.util.concurrent.TimeUnit
+
+// Firebase imports
+import com.google.firebase.messaging.FirebaseMessaging
+
+// JSON imports
+import org.json.JSONObject
+import org.json.JSONArray
+
+// Translation imports
 import com.garfunkel.derriteice.translation.AdaptiveTranslator
 import com.garfunkel.derriteice.translation.DeviceCapabilityDetector
 import com.garfunkel.derriteice.translation.SimpleTranslator
+
+// Coroutines
 import kotlinx.coroutines.*
 import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
 import kotlin.coroutines.suspendCoroutine
+
+// Android imports
 import android.graphics.Color
 import android.Manifest
 import android.animation.ObjectAnimator
@@ -39,15 +58,23 @@ import android.widget.LinearLayout
 import android.widget.ProgressBar
 import android.widget.TextView
 import android.widget.Toast
+
+// AndroidX imports
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
+
+// Google services
 import com.google.android.gms.location.FusedLocationProviderClient
 import com.google.android.gms.location.LocationServices
+
+// Material design
 import com.google.android.material.card.MaterialCardView
 import com.google.android.material.floatingactionbutton.FloatingActionButton
 import com.google.android.material.textfield.TextInputEditText
+
+// OSM imports
 import org.osmdroid.config.Configuration as OSMConfiguration
 import org.osmdroid.events.MapEventsReceiver
 import org.osmdroid.tileprovider.tilesource.TileSourceFactory
@@ -56,13 +83,13 @@ import org.osmdroid.views.MapView
 import org.osmdroid.views.overlay.MapEventsOverlay
 import org.osmdroid.views.overlay.Marker
 import org.osmdroid.views.overlay.Polygon
-import java.io.IOException
+
+// Java imports
 import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Locale
 import java.util.UUID
 import kotlin.math.*
-
 // Updated Report data class with translation support
 data class Report(
     val id: String,
@@ -83,6 +110,171 @@ data class Alert(
     val timestamp: Long = System.currentTimeMillis()
 )
 
+// Fixed Backend Client for anonymous communication with server
+class BackendClient {
+    companion object {
+
+        private const val BACKEND_URL = "http://192.168.1.44:3000"
+    }
+
+    private val client = OkHttpClient.Builder()
+        .connectTimeout(30, TimeUnit.SECONDS)
+        .readTimeout(30, TimeUnit.SECONDS)
+        .build()
+
+    /**
+     * Test if backend is reachable
+     */
+    fun testConnection(callback: (Boolean, String) -> Unit) {
+        val request = Request.Builder()
+            .url("$BACKEND_URL/health")
+            .get()
+            .build()
+
+        client.newCall(request).enqueue(object : Callback {
+            override fun onFailure(call: Call, e: IOException) {
+                callback(false, "Cannot connect: ${e.message}")
+            }
+
+            override fun onResponse(call: Call, response: Response) {
+                response.use { // Properly handle response
+                    if (response.isSuccessful) {
+                        val body = response.body?.string() ?: "No response body"
+                        callback(true, "Connected! Response: $body")
+                    } else {
+                        callback(false, "Server error: ${response.code}")
+                    }
+                }
+            }
+        })
+    }
+
+    /**
+     * Submit report to backend
+     */
+    fun submitReport(
+        latitude: Double,
+        longitude: Double,
+        content: String,
+        language: String,
+        hasPhoto: Boolean,
+        callback: (Boolean, String) -> Unit
+    ) {
+        try {
+            val json = JSONObject().apply {
+                put("lat", latitude)
+                put("lng", longitude)
+                put("content", content)
+                put("language", language)
+                put("hasPhoto", hasPhoto)
+            }
+
+            val mediaType = "application/json; charset=utf-8".toMediaType()
+            val requestBody = json.toString().toRequestBody(mediaType)
+
+            val request = Request.Builder()
+                .url("$BACKEND_URL/report")
+                .post(requestBody)
+                .build()
+
+            client.newCall(request).enqueue(object : Callback {
+                override fun onFailure(call: Call, e: IOException) {
+                    callback(false, "Network error: ${e.message}")
+                }
+
+                override fun onResponse(call: Call, response: Response) {
+                    response.use {
+                        if (response.isSuccessful) {
+                            val responseBody = response.body?.string() ?: "{}"
+                            try {
+                                val jsonResponse = JSONObject(responseBody)
+                                val success = jsonResponse.optBoolean("success", false)
+                                val zone = jsonResponse.optString("zone", "unknown")
+
+                                if (success) {
+                                    callback(true, "Report submitted to zone: $zone")
+                                } else {
+                                    callback(false, "Server rejected report")
+                                }
+                            } catch (e: Exception) {
+                                callback(false, "Invalid server response")
+                            }
+                        } else {
+                            callback(false, "Server error: ${response.code}")
+                        }
+                    }
+                }
+            })
+        } catch (e: Exception) {
+            callback(false, "Request creation failed: ${e.message}")
+        }
+    }
+
+    /**
+     * Subscribe to push notifications for a location
+     */
+    fun subscribeToAlerts(
+        latitude: Double,
+        longitude: Double,
+        callback: (Boolean, String) -> Unit
+    ) {
+        // Get FCM token first
+        FirebaseMessaging.getInstance().token
+            .addOnCompleteListener { task ->
+                if (!task.isSuccessful) {
+                    callback(false, "Failed to get FCM token: ${task.exception?.message}")
+                    return@addOnCompleteListener
+                }
+
+                try {
+                    val token = task.result
+                    val json = JSONObject().apply {
+                        put("lat", latitude)
+                        put("lng", longitude)
+                        put("platform", "android")
+                        put("token", token)
+                    }
+
+                    val mediaType = "application/json; charset=utf-8".toMediaType()
+                    val requestBody = json.toString().toRequestBody(mediaType)
+
+                    val request = Request.Builder()
+                        .url("$BACKEND_URL/subscribe")
+                        .post(requestBody)
+                        .build()
+
+                    client.newCall(request).enqueue(object : Callback {
+                        override fun onFailure(call: Call, e: IOException) {
+                            callback(false, "Subscription failed: ${e.message}")
+                        }
+
+                        override fun onResponse(call: Call, response: Response) {
+                            response.use {
+                                if (response.isSuccessful) {
+                                    val responseBody = response.body?.string() ?: "{}"
+                                    try {
+                                        val jsonResponse = JSONObject(responseBody)
+                                        val zones = jsonResponse.optJSONArray("affected_zones")
+                                        callback(true, "Subscribed to ${zones?.length() ?: 0} zones")
+                                    } catch (e: Exception) {
+                                        callback(true, "Subscribed successfully")
+                                    }
+                                } else {
+                                    callback(false, "Subscription error: ${response.code}")
+                                }
+                            }
+                        }
+                    })
+                } catch (e: Exception) {
+                    callback(false, "Subscription request failed: ${e.message}")
+                }
+            }
+            .addOnFailureListener { e ->
+                callback(false, "FCM token error: ${e.message}")
+            }
+    }
+}
+
 class MainActivity : AppCompatActivity() {
 
     private lateinit var mapView: MapView
@@ -100,6 +292,9 @@ class MainActivity : AppCompatActivity() {
     private lateinit var fusedLocationClient: FusedLocationProviderClient
     private lateinit var geocoder: Geocoder
     private lateinit var preferences: SharedPreferences
+
+    // Backend client for server communication
+    private lateinit var backendClient: BackendClient
 
     // Adaptive translator system
     private lateinit var adaptiveTranslator: AdaptiveTranslator
@@ -162,6 +357,9 @@ class MainActivity : AppCompatActivity() {
         // Initialize preferences
         preferences = getSharedPreferences("app_prefs", Context.MODE_PRIVATE)
 
+        // Initialize backend client
+        backendClient = BackendClient()
+
         // Load viewed alerts from preferences
         loadViewedAlerts()
 
@@ -189,7 +387,7 @@ class MainActivity : AppCompatActivity() {
         setupInstructionOverlay()
         setupBottomNavigation()
         setupSearchBar()
-
+        startLocationUpdates()
         // Initialize translation system (silent, with background model downloads)
         initializeTranslationSystem()
 
@@ -201,6 +399,34 @@ class MainActivity : AppCompatActivity() {
 
         // Start periodic alert checking
         startAlertChecker()
+    }
+    private fun startLocationUpdates() {
+        if (!hasLocationPermission()) return
+
+        val locationRequest = com.google.android.gms.location.LocationRequest.create().apply {
+            interval = 30000 // 30 seconds
+            fastestInterval = 15000 // 15 seconds
+            priority = com.google.android.gms.location.LocationRequest.PRIORITY_HIGH_ACCURACY
+        }
+
+        val locationCallback = object : com.google.android.gms.location.LocationCallback() {
+            override fun onLocationResult(locationResult: com.google.android.gms.location.LocationResult) {
+                locationResult.lastLocation?.let { location ->
+                    currentLocation = location
+                    val userLocation = GeoPoint(location.latitude, location.longitude)
+                    addLocationMarker(userLocation)
+
+                    // Subscribe to alerts for new location
+                    subscribeToAlertsForLocation(location.latitude, location.longitude)
+                }
+            }
+        }
+
+        try {
+            fusedLocationClient.requestLocationUpdates(locationRequest, locationCallback, Looper.getMainLooper())
+        } catch (e: SecurityException) {
+            Log.e("Location", "Permission denied for location updates")
+        }
     }
 
     /**
@@ -846,6 +1072,7 @@ class MainActivity : AppCompatActivity() {
 
         btnSettings.setOnClickListener {
             animateButtonPress(btnSettings)
+            testBackendConnection() // Now tests backend connection!
         }
 
         btnAlerts.setOnClickListener {
@@ -864,6 +1091,40 @@ class MainActivity : AppCompatActivity() {
         }
 
         btnAlerts.imageTintList = android.content.res.ColorStateList.valueOf(tintColor)
+    }
+
+    // Backend connection testing
+    private fun testBackendConnection() {
+        showStatusCard("Testing backend connection...", isLoading = true)
+
+        backendClient.testConnection { success, message ->
+            runOnUiThread {
+                if (success) {
+                    showStatusCard("✅ Backend connected!", isLoading = false)
+                    Log.d("Backend", "Connection test: $message")
+                } else {
+                    showStatusCard("❌ Backend offline", isError = true)
+                    Log.e("Backend", "Connection failed: $message")
+                }
+
+                Handler(Looper.getMainLooper()).postDelayed({
+                    hideStatusCard()
+                }, 3000)
+            }
+        }
+    }
+
+    // Subscribe to alerts for location
+    private fun subscribeToAlertsForLocation(latitude: Double, longitude: Double) {
+        backendClient.subscribeToAlerts(latitude, longitude) { success, message ->
+            runOnUiThread {
+                if (success) {
+                    Log.d("Backend", "Subscribed to alerts: $message")
+                } else {
+                    Log.w("Backend", "Alert subscription failed: $message")
+                }
+            }
+        }
     }
 
     private fun setupSearchBar() {
@@ -1051,6 +1312,9 @@ class MainActivity : AppCompatActivity() {
                         hasInitialLocationSet = true
                         hideStatusCard()
                         checkForNewAlerts()
+
+                        // Subscribe to alerts for this location
+                        subscribeToAlertsForLocation(location.latitude, location.longitude)
                     } else {
                         mapView.controller.animateTo(userLocation, 18.0, 1000L)
                         addLocationMarker(userLocation)
@@ -1245,7 +1509,9 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    // Updated createReportWithLanguage to include backend submission
     private fun createReportWithLanguage(location: GeoPoint, text: String, photo: Bitmap?, detectedLanguage: String) {
+        // First, create the local report (keep your existing local functionality)
         val report = Report(
             id = UUID.randomUUID().toString(),
             location = location,
@@ -1261,29 +1527,49 @@ class MainActivity : AppCompatActivity() {
         addReportToMap(report)
         saveReportsToPreferences()
 
+        // Show immediate local feedback
         val message = if (getSavedLanguage() == "es") {
-            when (detectedLanguage) {
-                "es" -> "Reporte enviado en español"
-                "en" -> "Reporte enviado en inglés"
-                else -> "Reporte enviado"
-            }
+            "Enviando al servidor..."
         } else {
-            when (detectedLanguage) {
-                "es" -> "Report sent in Spanish"
-                "en" -> "Report sent in English"
-                else -> "Report sent"
+            "Sending to server..."
+        }
+        showStatusCard(message, isLoading = true)
+
+        // Submit to backend
+        backendClient.submitReport(
+            latitude = location.latitude,
+            longitude = location.longitude,
+            content = text,
+            language = detectedLanguage,
+            hasPhoto = photo != null
+        ) { success, message ->
+            runOnUiThread {
+                if (success) {
+                    val successMessage = if (getSavedLanguage() == "es") {
+                        "✅ Enviado al servidor"
+                    } else {
+                        "✅ Sent to server"
+                    }
+                    showStatusCard(successMessage, isLoading = false)
+                    Log.d("Backend", "Report submitted: $message")
+
+                    // Subscribe to alerts for this location
+                    subscribeToAlertsForLocation(location.latitude, location.longitude)
+                } else {
+                    val errorMessage = if (getSavedLanguage() == "es") {
+                        "❌ Error de conexión"
+                    } else {
+                        "❌ Connection error"
+                    }
+                    showStatusCard(errorMessage, isError = true)
+                    Log.e("Backend", "Failed to submit: $message")
+                }
+
+                Handler(Looper.getMainLooper()).postDelayed({
+                    hideStatusCard()
+                }, 3000)
             }
         }
-
-        showStatusCard(message, isLoading = false)
-
-        Handler(Looper.getMainLooper()).postDelayed({
-            hideStatusCard()
-        }, 3000)
-
-        Handler(Looper.getMainLooper()).postDelayed({
-            checkForNewAlerts()
-        }, 5000)
     }
 
     private fun addReportToMap(report: Report) {

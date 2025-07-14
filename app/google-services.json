@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "260537097056",
+    "project_id": "mibackend-2f3f3",
+    "storage_bucket": "mibackend-2f3f3.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:260537097056:android:eeada055b58c0995775c05",
+        "android_client_info": {
+          "package_name": "com.garfunkel.derriteice"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBmogVDPEDQ4azEWjjd1e0wfvBJn5vf9qo"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
