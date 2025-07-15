@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <!-- App Name -->
-    <string name="app_name">Derrite ICE</string>
+    <string name="app_name">Derrite</string>
 
     <!-- Navigation -->
     <string name="language_toggle">Español</string>
@@ -34,14 +34,14 @@
     <string name="please_enter_address">Please enter an address</string>
 
     <!-- Reports -->
-    <string name="safety_report">Safety Report</string>
+    <string name="safety_report">Report</string>
     <string name="report_created">Report created anonymously</string>
-    <string name="confirm_report_title">Report Safety Issue?</string>
-    <string name="confirm_report_message">Report anonymous safety alert at this location?</string>
+    <string name="confirm_report_title">Report Issue?</string>
+    <string name="confirm_report_message">Report anonymous alert at this location?</string>
     <string name="yes_report">Yes, Report</string>
     <string name="cancel">Cancel</string>
-    <string name="create_report_title">Create Safety Report</string>
-    <string name="report_description_hint">Describe the safety concern...</string>
+    <string name="create_report_title">Create Report</string>
+    <string name="report_description_hint">Describe the concern...</string>
     <string name="submit">Submit</string>
     <string name="please_enter_description">Please enter a description</string>
     <string name="reported_time">Reported %1$s</string>
@@ -61,37 +61,37 @@
     <string name="hours_ago">%1$d hr ago</string>
     <string name="days_ago">%1$d day ago</string>
 
-    <string name="report_input_title">Safety Report Details</string>
+    <string name="report_input_title">Report Details</string>
     <string name="version">Version</string>
     <string name="notifications">Notifications</string>
     <string name="nearby_reports">Nearby Reports</string>
-    <string name="about_description">Derrite ICE helps communities stay informed through anonymous safety reporting</string>
+    <string name="about_description">Derrite helps communities stay informed through anonymous reporting</string>
     <string name="privacy">Privacy</string>
     <string name="privacy_description">Your privacy is protected with anonymous reporting</string>
 
     <string name="back_button">Back</string>
 
 
-        <!-- Alert System -->
-        <string name="alerts">Alerts</string>
-        <string name="alerts_in_your_area">Alerts in Your Area</string>
-        <string name="alerts_for_area">Alerts for %1$s</string>
-        <string name="alerts_for_your_area">Alerts for Your Area</string>
-        <string name="your_area">Your Area</string>
-        <string name="checking_your_area">Checking your area…</string>
-        <string name="checking_for_alerts">Checking for alerts…</string>
-        <string name="no_alerts_in_area">All Clear!</string>
-        <string name="no_alerts_description">No safety reports in your area right now.</string>
-        <string name="new_alerts_found">%1$d new alerts in your area</string>
-        <string name="new_alerts_available">New alerts in your area</string>
-        <string name="location_needed_for_alerts">Location needed to check for alerts</string>
+    <!-- Alert System -->
+    <string name="alerts">Alerts</string>
+    <string name="alerts_in_your_area">Alerts in Your Area</string>
+    <string name="alerts_for_area">Alerts for %1$s</string>
+    <string name="alerts_for_your_area">Alerts for Your Area</string>
+    <string name="your_area">Your Area</string>
+    <string name="checking_your_area">Checking your area…</string>
+    <string name="checking_for_alerts">Checking for alerts…</string>
+    <string name="no_alerts_in_area">All Clear!</string>
+    <string name="no_alerts_description">No reports in your area right now.</string>
+    <string name="new_alerts_found">%1$d new alerts in your area</string>
+    <string name="new_alerts_available">New alerts in your area</string>
+    <string name="location_needed_for_alerts">Location needed to check for alerts</string>
 
-        <!-- Alert Item -->
-        <string name="has_photo">Photo attached</string>
-        <string name="view_on_map">View on Map</string>
-        <string name="view_details">View Details</string>
-        <string name="refresh">Refresh</string>
-        <string name="mark_all_read">Mark All Read</string>
+    <!-- Alert Item -->
+    <string name="has_photo">Photo attached</string>
+    <string name="view_on_map">View on Map</string>
+    <string name="view_details">View Details</string>
+    <string name="refresh">Refresh</string>
+    <string name="mark_all_read">Mark All Read</string>
 
     <string name="distance_feet">%1$d ft away</string>
     <string name="distance_miles">%1$s mi away</string>
@@ -101,9 +101,9 @@
     <string name="translation_error">Translation system error</string>
     <string name="translating">Translating...</string>
     <string name="translation_failed">Translation failed</string>
-    <string name="ai_translate">🤖 AI TRANSLATE</string>
-    <string name="smart_translate">⚡ SMART TRANSLATE</string>
-    <string name="basic_translate">📝 TRANSLATE</string>
+    <string name="ai_translate">AI TRANSLATE</string>
+    <string name="smart_translate">SMART TRANSLATE</string>
+    <string name="basic_translate">TRANSLATE</string>
     <string name="translation_confidence">Translation confidence: %d%%</string>
     <string name="translation_method_ai">AI Translation</string>
     <string name="translation_method_smart">Smart Translation</string>
@@ -114,6 +114,6 @@
     <string name="device_capability_low">Entry-level device with basic translation</string>
 
     <!-- Instructions -->
-    <string name="instruction_title">Anonymous Safety Reporting</string>
-    <string name="instruction_description">Long press anywhere on the map to create an anonymous safety report</string>
+    <string name="instruction_title">Anonymous Reporting</string>
+    <string name="instruction_description">Long press anywhere on the map to create an anonymous report</string>
 </resources>

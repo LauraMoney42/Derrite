@@ -19,5 +19,5 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "Derrite ICE"
+rootProject.name = "Derrite"
 include(":app")
