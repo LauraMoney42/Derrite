@@ -277,6 +277,8 @@ class MainActivity : AppCompatActivity() {
     private lateinit var adaptiveTranslator: AdaptiveTranslator
     private var translatorInitialized = false
     private var currentTranslationJob: Job? = null
+    private var lastZoomTime = 0L
+    private val zoomThrottleMs = 150L
 
     private var currentLocationMarker: Marker? = null
     private var currentSearchMarker: Marker? = null
@@ -296,12 +298,21 @@ class MainActivity : AppCompatActivity() {
     private val REPORT_DURATION_HOURS = 8L
     private val ZIP_CODE_RADIUS_METERS = 8047.0
 
+    private val ALERT_DISTANCE_1_MILE = 1609.0
+    private val ALERT_DISTANCE_2_MILES = 3218.0
+    private val ALERT_DISTANCE_3_MILES = 4827.0
+    private val ALERT_DISTANCE_5_MILES = 8047.0
+    private val ALERT_DISTANCE_ZIP_CODE = 8050.0
+    private val ALERT_DISTANCE_STATE = 160934.0
+
     private val cameraLauncher = registerForActivityResult(
         ActivityResultContracts.TakePicturePreview()
     ) { bitmap ->
         if (bitmap != null) {
             currentPhoto = stripPhotoMetadata(bitmap)
-            showStatusCard("Photo added anonymously", isLoading = false)
+            val message = if (getSavedLanguage() == "es")
+                "Foto agregada anónimamente" else "Photo added anonymously"
+            showStatusCard(message, isLoading = false)
         }
     }
 
@@ -315,12 +326,18 @@ class MainActivity : AppCompatActivity() {
                 inputStream?.close()
                 if (bitmap != null) {
                     currentPhoto = stripPhotoMetadata(bitmap)
-                    showStatusCard("Photo added anonymously", isLoading = false)
+                    val message = if (getSavedLanguage() == "es")
+                        "Foto agregada anónimamente" else "Photo added anonymously"
+                    showStatusCard(message, isLoading = false)
                 } else {
-                    showStatusCard("Failed to load photo", isError = true)
+                    val message = if (getSavedLanguage() == "es")
+                        "Error al cargar foto" else "Failed to load photo"
+                    showStatusCard(message, isError = true)
                 }
             } catch (e: Exception) {
-                showStatusCard("Failed to load photo", isError = true)
+                val message = if (getSavedLanguage() == "es")
+                    "Error al cargar foto" else "Failed to load photo"
+                showStatusCard(message, isError = true)
             }
         }
     }
@@ -328,59 +345,94 @@ class MainActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        preferences = getSharedPreferences("app_prefs", Context.MODE_PRIVATE)
-        backendClient = BackendClient()
+        try {
+            preferences = getSharedPreferences("app_prefs", Context.MODE_PRIVATE)
+            backendClient = BackendClient()
 
-        loadViewedAlerts()
-        loadSavedReports()
-        setAppLanguage(getSavedLanguage())
+            loadViewedAlerts()
+            loadSavedReports()
+            setAppLanguage(getSavedLanguage())
 
-        OSMConfiguration.getInstance().load(this, getSharedPreferences("osmdroid", 0))
-        OSMConfiguration.getInstance().userAgentValue = packageName
+            OSMConfiguration.getInstance().load(this, getSharedPreferences("osmdroid", 0))
+            OSMConfiguration.getInstance().userAgentValue = packageName
 
-        setContentView(R.layout.activity_main)
+            setContentView(R.layout.activity_main)
 
-        fusedLocationClient = LocationServices.getFusedLocationProviderClient(this)
-        geocoder = Geocoder(this, Locale.getDefault())
+            fusedLocationClient = LocationServices.getFusedLocationProviderClient(this)
+            geocoder = Geocoder(this, Locale.getDefault())
 
-        setupViews()
-        setupMap()
-        setupLocationButton()
-        setupStatusCard()
-        setupInstructionOverlay()
-        setupBottomNavigation()
-        setupSearchBar()
-        startLocationUpdates()
-        initializeTranslationSystem()
-        autoLocateOnStartup()
-        startReportCleanupTimer()
-        startAlertChecker()
+            setupViews()
+            setupMap()
+            setupLocationButton()
+            setupStatusCard()
+            setupInstructionOverlay()
+            setupBottomNavigation()
+            setupSearchBar()
+
+            Handler(Looper.getMainLooper()).postDelayed({
+                try {
+                    startLocationUpdates()
+                    initializeTranslationSystem()
+                    autoLocateOnStartup()
+                    startReportCleanupTimer()
+                    startAlertChecker()
+                } catch (e: Exception) {
+                    android.util.Log.e("DerriteICE", "Error in delayed initialization: ${e.message}")
+                }
+            }, 1000)
+        } catch (e: Exception) {
+            android.util.Log.e("DerriteICE", "Error in onCreate: ${e.message}", e)
+
+            try {
+                setContentView(R.layout.activity_main)
+                showStatusCard("App initialization error - please restart", isError = true)
+            } catch (innerE: Exception) {
+                // If even basic setup fails, do nothing to avoid crash
+            }
+        }
     }
 
     private fun startLocationUpdates() {
-        if (!hasLocationPermission()) return
+        try {
+            if (!hasLocationPermission()) return
 
-        val locationRequest = com.google.android.gms.location.LocationRequest.create().apply {
-            interval = 30000
-            fastestInterval = 15000
-            priority = com.google.android.gms.location.LocationRequest.PRIORITY_HIGH_ACCURACY
-        }
+            val locationRequest = com.google.android.gms.location.LocationRequest.Builder(
+                com.google.android.gms.location.Priority.PRIORITY_HIGH_ACCURACY,
+                30000
+            ).apply {
+                setMinUpdateIntervalMillis(15000)
+            }.build()
 
-        val locationCallback = object : com.google.android.gms.location.LocationCallback() {
-            override fun onLocationResult(locationResult: com.google.android.gms.location.LocationResult) {
-                locationResult.lastLocation?.let { location ->
-                    currentLocation = location
-                    val userLocation = GeoPoint(location.latitude, location.longitude)
-                    addLocationMarker(userLocation)
-                    subscribeToAlertsForLocation(location.latitude, location.longitude)
+            val locationCallback = object : com.google.android.gms.location.LocationCallback() {
+                override fun onLocationResult(locationResult: com.google.android.gms.location.LocationResult) {
+                    try {
+                        locationResult.lastLocation?.let { location ->
+                            currentLocation = location
+                            val userLocation = GeoPoint(location.latitude, location.longitude)
+
+                            if (::mapView.isInitialized && mapView.repository != null) {
+                                addLocationMarker(userLocation)
+                            } else {
+                                Handler(Looper.getMainLooper()).postDelayed({
+                                    if (::mapView.isInitialized && mapView.repository != null) {
+                                        addLocationMarker(userLocation)
+                                    }
+                                }, 1000)
+                            }
+
+                            subscribeToAlertsForLocation(location.latitude, location.longitude)
+                        }
+                    } catch (e: Exception) {
+                        android.util.Log.e("DerriteICE", "Error in location callback: ${e.message}")
+                    }
                 }
             }
-        }
 
-        try {
             fusedLocationClient.requestLocationUpdates(locationRequest, locationCallback, Looper.getMainLooper())
         } catch (e: SecurityException) {
-            // Permission denied
+            android.util.Log.e("DerriteICE", "Permission denied for location updates")
+        } catch (e: Exception) {
+            android.util.Log.e("DerriteICE", "Error starting location updates: ${e.message}")
         }
     }
 
@@ -419,13 +471,13 @@ class MainActivity : AppCompatActivity() {
                 downloadTranslationModel(
                     com.google.mlkit.nl.translate.TranslateLanguage.SPANISH,
                     com.google.mlkit.nl.translate.TranslateLanguage.ENGLISH,
-                    "Spanish → English"
+                    "Spanish to English"
                 )
 
                 downloadTranslationModel(
                     com.google.mlkit.nl.translate.TranslateLanguage.ENGLISH,
                     com.google.mlkit.nl.translate.TranslateLanguage.SPANISH,
-                    "English → Spanish"
+                    "English to Spanish"
                 )
             } catch (e: Exception) {
                 // Background download failed
@@ -556,8 +608,8 @@ class MainActivity : AppCompatActivity() {
 
     private fun loadSavedReports() {
         try {
-            val reportsJson = preferences.getString("saved_reports", "[]")
-            val reportsList = parseReportsFromJson(reportsJson ?: "[]")
+            val reportsJson = preferences.getString("saved_reports", "[]") ?: "[]"
+            val reportsList = parseReportsFromJson(reportsJson)
             val currentTime = System.currentTimeMillis()
             val validReports = reportsList.filter { it.expiresAt > currentTime }
 
@@ -565,12 +617,31 @@ class MainActivity : AppCompatActivity() {
             activeReports.addAll(validReports)
 
             Handler(Looper.getMainLooper()).postDelayed({
-                validReports.forEach { report ->
-                    addReportToMap(report)
+                try {
+                    if (::mapView.isInitialized && mapView.repository != null) {
+                        validReports.forEach { report ->
+                            addReportToMap(report)
+                        }
+                    } else {
+                        Handler(Looper.getMainLooper()).postDelayed({
+                            try {
+                                if (::mapView.isInitialized && mapView.repository != null) {
+                                    validReports.forEach { report ->
+                                        addReportToMap(report)
+                                    }
+                                }
+                            } catch (e: Exception) {
+                                android.util.Log.e("DerriteICE", "Error in delayed report loading retry: ${e.message}")
+                            }
+                        }, 2000)
+                    }
+                } catch (e: Exception) {
+                    android.util.Log.e("DerriteICE", "Error in delayed report loading: ${e.message}")
                 }
-            }, 1000)
+            }, 2000)
         } catch (e: Exception) {
             activeReports.clear()
+            android.util.Log.e("DerriteICE", "Error loading saved reports: ${e.message}")
         }
     }
 
@@ -586,27 +657,38 @@ class MainActivity : AppCompatActivity() {
     private fun parseReportsFromJson(json: String): List<Report> {
         val reports = mutableListOf<Report>()
         try {
+            if (json.isBlank() || json == "[]") {
+                return reports
+            }
+
             val lines = json.split("|||")
             for (line in lines) {
-                if (line.trim().isEmpty()) continue
+                try {
+                    if (line.trim().isEmpty()) continue
 
-                val parts = line.split(":::")
-                if (parts.size >= 8) {
-                    val report = Report(
-                        id = parts[0],
-                        location = GeoPoint(parts[1].toDouble(), parts[2].toDouble()),
-                        originalText = parts[3],
-                        originalLanguage = parts[4],
-                        hasPhoto = parts[5].toBoolean(),
-                        photo = null,
-                        timestamp = parts[6].toLong(),
-                        expiresAt = parts[7].toLong()
-                    )
-                    reports.add(report)
+                    val parts = line.split(":::")
+                    if (parts.size >= 8) {
+                        val report = Report(
+                            id = parts[0],
+                            location = GeoPoint(
+                                parts[1].toDoubleOrNull() ?: 0.0,
+                                parts[2].toDoubleOrNull() ?: 0.0
+                            ),
+                            originalText = parts[3],
+                            originalLanguage = parts[4],
+                            hasPhoto = parts[5].toBooleanStrictOrNull() ?: false,
+                            photo = null,
+                            timestamp = parts[6].toLongOrNull() ?: System.currentTimeMillis(),
+                            expiresAt = parts[7].toLongOrNull() ?: (System.currentTimeMillis() + (8 * 60 * 60 * 1000))
+                        )
+                        reports.add(report)
+                    }
+                } catch (e: Exception) {
+                    continue
                 }
             }
         } catch (e: Exception) {
-            // Return empty list if parsing fails
+            // Return empty list if parsing fails completely
         }
         return reports
     }
@@ -629,42 +711,56 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun checkForNewAlerts() {
-        currentLocation?.let { location ->
-            val newAlerts = mutableListOf<Alert>()
+        try {
+            currentLocation?.let { location ->
+                val newAlerts = mutableListOf<Alert>()
+                val userAlertDistance = getSavedAlertDistance()
 
-            for (report in activeReports) {
-                val distance = calculateDistance(
-                    location.latitude, location.longitude,
-                    report.location.latitude, report.location.longitude
-                )
-
-                if (distance <= ZIP_CODE_RADIUS_METERS) {
-                    val existingAlert = activeAlerts.find { it.report.id == report.id }
-                    if (existingAlert == null) {
-                        val alert = Alert(
-                            id = UUID.randomUUID().toString(),
-                            report = report,
-                            distanceFromUser = distance,
-                            isViewed = viewedAlertIds.contains(report.id)
+                for (report in activeReports) {
+                    try {
+                        val distance = calculateDistance(
+                            location.latitude, location.longitude,
+                            report.location.latitude, report.location.longitude
                         )
-                        newAlerts.add(alert)
-                        activeAlerts.add(alert)
+
+                        if (distance <= userAlertDistance) {
+                            val existingAlert = activeAlerts.find { it.report.id == report.id }
+                            if (existingAlert == null) {
+                                val alert = Alert(
+                                    id = UUID.randomUUID().toString(),
+                                    report = report,
+                                    distanceFromUser = distance,
+                                    isViewed = viewedAlertIds.contains(report.id)
+                                )
+                                newAlerts.add(alert)
+                                activeAlerts.add(alert)
+                            }
+                        }
+                    } catch (e: Exception) {
+                        continue
+                    }
+                }
+
+                val hasUnviewed = activeAlerts.any { !it.isViewed && !viewedAlertIds.contains(it.report.id) }
+                updateAlertsButtonColor(hasUnviewed)
+
+                if (newAlerts.isNotEmpty()) {
+                    val unviewedNewAlerts = newAlerts.filter { !it.isViewed && !viewedAlertIds.contains(it.report.id) }
+                    if (unviewedNewAlerts.isNotEmpty()) {
+                        val alertDistanceText = getAlertDistanceText(userAlertDistance)
+                        val message = if (getSavedLanguage() == "es")
+                            "${unviewedNewAlerts.size} nuevas alertas dentro de $alertDistanceText"
+                        else
+                            "${unviewedNewAlerts.size} new alerts within $alertDistanceText"
+                        showStatusCard(message, isLoading = false)
+                        Handler(Looper.getMainLooper()).postDelayed({
+                            hideStatusCard()
+                        }, 3000)
                     }
                 }
             }
-
-            val hasUnviewed = activeAlerts.any { !it.isViewed && !viewedAlertIds.contains(it.report.id) }
-            updateAlertsButtonColor(hasUnviewed)
-
-            if (newAlerts.isNotEmpty()) {
-                val unviewedNewAlerts = newAlerts.filter { !it.isViewed && !viewedAlertIds.contains(it.report.id) }
-                if (unviewedNewAlerts.isNotEmpty()) {
-                    showStatusCard("${unviewedNewAlerts.size} new alerts found", isLoading = false)
-                    Handler(Looper.getMainLooper()).postDelayed({
-                        hideStatusCard()
-                    }, 3000)
-                }
-            }
+        } catch (e: Exception) {
+            // Silently fail
         }
     }
 
@@ -682,7 +778,9 @@ class MainActivity : AppCompatActivity() {
         currentLocation?.let { location ->
             showAlertsDialog(location)
         } ?: run {
-            showStatusCard("Location needed for alerts", isError = true)
+            val message = if (getSavedLanguage() == "es")
+                "Se necesita ubicación para alertas" else "Location needed for alerts"
+            showStatusCard(message, isError = true)
         }
     }
 
@@ -741,12 +839,18 @@ class MainActivity : AppCompatActivity() {
                         append(address.postalCode)
                     }
                 }
-                textView.text = "Alerts for ${locationText.ifEmpty { "your area" }}"
+                val text = if (getSavedLanguage() == "es")
+                    "Alertas para ${locationText.ifEmpty { "tu área" }}"
+                else
+                    "Alerts for ${locationText.ifEmpty { "your area" }}"
+                textView.text = text
             } else {
-                textView.text = "Alerts for your area"
+                val text = if (getSavedLanguage() == "es") "Alertas para tu área" else "Alerts for your area"
+                textView.text = text
             }
         } catch (e: IOException) {
-            textView.text = "Alerts for your area"
+            val text = if (getSavedLanguage() == "es") "Alertas para tu área" else "Alerts for your area"
+            textView.text = text
         }
     }
 
@@ -770,63 +874,98 @@ class MainActivity : AppCompatActivity() {
 
     private fun loadAlertsIntoDialog(alertsContainer: LinearLayout, noAlertsContainer: LinearLayout,
                                      loadingContainer: LinearLayout, userLocation: Location) {
-        alertsContainer.removeAllViews()
+        try {
+            alertsContainer.removeAllViews()
 
-        val nearbyUnviewedAlerts = activeAlerts
-            .filter { it.distanceFromUser <= ZIP_CODE_RADIUS_METERS }
-            .filter { !viewedAlertIds.contains(it.report.id) }
-            .sortedBy { it.distanceFromUser }
+            val userAlertDistance = getSavedAlertDistance()
 
-        loadingContainer.visibility = View.GONE
+            val nearbyUnviewedAlerts = activeAlerts
+                .filter { !viewedAlertIds.contains(it.report.id) }
+                .map { alert ->
+                    val currentDistance = calculateDistance(
+                        userLocation.latitude, userLocation.longitude,
+                        alert.report.location.latitude, alert.report.location.longitude
+                    )
+                    alert.copy(distanceFromUser = currentDistance)
+                }
+                .filter { it.distanceFromUser <= userAlertDistance }
+                .sortedBy { it.distanceFromUser }
 
-        currentAlertsDialog?.let { dialog ->
-            val btnMarkAllRead = dialog.findViewById<Button>(R.id.btn_mark_all_read)
+            loadingContainer.visibility = View.GONE
 
-            if (nearbyUnviewedAlerts.isEmpty()) {
-                noAlertsContainer.visibility = View.VISIBLE
-                btnMarkAllRead?.visibility = View.GONE
-            } else {
-                noAlertsContainer.visibility = View.GONE
-                btnMarkAllRead?.visibility = View.VISIBLE
+            currentAlertsDialog?.let { dialog ->
+                val btnMarkAllRead = dialog.findViewById<Button>(R.id.btn_mark_all_read)
 
-                for (alert in nearbyUnviewedAlerts) {
-                    val alertItemView = createAlertItemView(alert)
-                    alertsContainer.addView(alertItemView)
+                if (nearbyUnviewedAlerts.isEmpty()) {
+                    noAlertsContainer.visibility = View.VISIBLE
+                    btnMarkAllRead?.visibility = View.GONE
+                } else {
+                    noAlertsContainer.visibility = View.GONE
+                    btnMarkAllRead?.visibility = View.VISIBLE
+
+                    for (alert in nearbyUnviewedAlerts) {
+                        try {
+                            val alertItemView = createAlertItemView(alert)
+                            alertsContainer.addView(alertItemView)
+                        } catch (e: Exception) {
+                            continue
+                        }
+                    }
                 }
             }
+        } catch (e: Exception) {
+            loadingContainer.visibility = View.GONE
+            noAlertsContainer.visibility = View.VISIBLE
         }
     }
 
     private fun createAlertItemView(alert: Alert): View {
-        val alertView = LayoutInflater.from(this).inflate(R.layout.item_alert, null)
+        return try {
+            val alertView = LayoutInflater.from(this).inflate(R.layout.item_alert, null)
 
-        val textAlertDistance = alertView.findViewById<TextView>(R.id.text_alert_distance)
-        val textAlertTime = alertView.findViewById<TextView>(R.id.text_alert_time)
-        val newAlertBadge = alertView.findViewById<View>(R.id.new_alert_badge)
-        val textAlertContent = alertView.findViewById<TextView>(R.id.text_alert_content)
-        val photoIndicator = alertView.findViewById<LinearLayout>(R.id.photo_indicator)
-        val btnViewOnMap = alertView.findViewById<Button>(R.id.btn_view_on_map)
-        val btnViewDetails = alertView.findViewById<Button>(R.id.btn_view_details)
+            val textAlertDistance = alertView.findViewById<TextView>(R.id.text_alert_distance)
+            val textAlertTime = alertView.findViewById<TextView>(R.id.text_alert_time)
+            val newAlertBadge = alertView.findViewById<View>(R.id.new_alert_badge)
+            val textAlertContent = alertView.findViewById<TextView>(R.id.text_alert_content)
+            val photoIndicator = alertView.findViewById<LinearLayout>(R.id.photo_indicator)
+            val btnViewOnMap = alertView.findViewById<Button>(R.id.btn_view_on_map)
+            val btnViewDetails = alertView.findViewById<Button>(R.id.btn_view_details)
 
-        textAlertDistance.text = formatDistance(alert.distanceFromUser)
-        textAlertTime.text = getTimeAgo(alert.report.timestamp)
-        textAlertContent.text = alert.report.originalText
+            textAlertDistance?.text = formatDistance(alert.distanceFromUser)
+            textAlertTime?.text = getTimeAgo(alert.report.timestamp)
+            textAlertContent?.text = alert.report.originalText ?: "Report content unavailable"
 
-        photoIndicator.visibility = if (alert.report.hasPhoto) View.VISIBLE else View.GONE
-        newAlertBadge.visibility = View.VISIBLE
+            photoIndicator?.visibility = if (alert.report.hasPhoto) View.VISIBLE else View.GONE
+            newAlertBadge?.visibility = View.VISIBLE
 
-        btnViewOnMap.setOnClickListener {
-            currentAlertsDialog?.dismiss()
-            showReportOnMap(alert.report)
-            markAlertAsViewed(alert.report.id)
+            btnViewOnMap?.setOnClickListener {
+                try {
+                    currentAlertsDialog?.dismiss()
+                    showReportOnMap(alert.report)
+                    markAlertAsViewed(alert.report.id)
+                } catch (e: Exception) {
+                    // Silently handle button click errors
+                }
+            }
+
+            btnViewDetails?.setOnClickListener {
+                try {
+                    showReportViewDialog(alert.report)
+                    markAlertAsViewed(alert.report.id)
+                } catch (e: Exception) {
+                    // Silently handle button click errors
+                }
+            }
+
+            alertView
+        } catch (e: Exception) {
+            TextView(this).apply {
+                text = "Error loading alert"
+                textSize = 14f
+                setPadding(16, 16, 16, 16)
+                setTextColor(Color.RED)
+            }
         }
-
-        btnViewDetails.setOnClickListener {
-            showReportViewDialog(alert.report)
-            markAlertAsViewed(alert.report.id)
-        }
-
-        return alertView
     }
 
     private fun formatDistance(distanceInMeters: Double): String {
@@ -900,6 +1039,28 @@ class MainActivity : AppCompatActivity() {
         preferences.edit().putString("app_language", languageCode).apply()
     }
 
+    private fun getSavedAlertDistance(): Double {
+        return preferences.getFloat("alert_distance", ALERT_DISTANCE_ZIP_CODE.toFloat()).toDouble()
+    }
+
+    private fun saveAlertDistance(distance: Double) {
+        preferences.edit().putFloat("alert_distance", distance.toFloat()).apply()
+    }
+
+    private fun getAlertDistanceText(distance: Double): String {
+        val isSpanish = getSavedLanguage() == "es"
+
+        return when (distance) {
+            ALERT_DISTANCE_1_MILE -> if (isSpanish) "1 milla" else "1 mile"
+            ALERT_DISTANCE_2_MILES -> if (isSpanish) "2 millas" else "2 miles"
+            ALERT_DISTANCE_3_MILES -> if (isSpanish) "3 millas" else "3 miles"
+            ALERT_DISTANCE_5_MILES -> if (isSpanish) "5 millas" else "5 miles"
+            ALERT_DISTANCE_ZIP_CODE -> if (isSpanish) "área de código postal" else "zip code area"
+            ALERT_DISTANCE_STATE -> if (isSpanish) "todo el estado" else "state-wide"
+            else -> if (isSpanish) "área de código postal (predeterminado)" else "zip code area (default)"
+        }
+    }
+
     private fun setAppLanguage(languageCode: String) {
         val locale = Locale(languageCode)
         Locale.setDefault(locale)
@@ -966,15 +1127,16 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun showSettingsDialog() {
+        val isSpanish = getSavedLanguage() == "es"
+
         val dialogLayout = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(48, 48, 48, 48)
             setBackgroundColor(Color.BLACK)
         }
 
-        // Title
         val titleText = TextView(this).apply {
-            text = "⚙️ Settings"
+            text = if (isSpanish) "Configuración" else "Settings"
             textSize = 24f
             setTextColor(Color.WHITE)
             gravity = android.view.Gravity.CENTER
@@ -983,13 +1145,15 @@ class MainActivity : AppCompatActivity() {
         }
         dialogLayout.addView(titleText)
 
-        // Version Information
         val versionInfo = TextView(this).apply {
             try {
                 val packageInfo = packageManager.getPackageInfo(packageName, 0)
-                text = "Version ${packageInfo.versionName} (${packageInfo.versionCode})"
+                text = if (isSpanish)
+                    "Versión ${packageInfo.versionName} (${packageInfo.versionCode})"
+                else
+                    "Version ${packageInfo.versionName} (${packageInfo.versionCode})"
             } catch (e: Exception) {
-                text = "Version 1.0.0"
+                text = if (isSpanish) "Versión 1.0.0" else "Version 1.0.0"
             }
             textSize = 14f
             setTextColor(Color.parseColor("#888888"))
@@ -998,9 +1162,8 @@ class MainActivity : AppCompatActivity() {
         }
         dialogLayout.addView(versionInfo)
 
-        // Backend Status
         val backendStatus = TextView(this).apply {
-            text = "🔗 Checking backend connection..."
+            text = if (isSpanish) "Verificando conexión del servidor..." else "Checking backend connection..."
             textSize = 16f
             setTextColor(Color.WHITE)
             setPadding(16, 16, 16, 16)
@@ -1015,43 +1178,50 @@ class MainActivity : AppCompatActivity() {
         }
         dialogLayout.addView(backendStatus)
 
-        // Test backend connection
         backendClient.testConnection { success, message ->
             runOnUiThread {
                 if (success) {
-                    backendStatus.text = "✅ Backend Connected"
+                    backendStatus.text = if (isSpanish) "Servidor Conectado" else "Backend Connected"
                     backendStatus.setBackgroundColor(Color.parseColor("#2E7D32"))
                 } else {
-                    backendStatus.text = "❌ Backend Offline"
+                    backendStatus.text = if (isSpanish) "Servidor Desconectado" else "Backend Offline"
                     backendStatus.setBackgroundColor(Color.parseColor("#C62828"))
                 }
             }
         }
 
-        // Settings Sections
-        addSettingsSection(dialogLayout, "📚 User Guide", "Learn how to use the app") {
+        addSettingsSection(dialogLayout,
+            if (isSpanish) "Guía del Usuario" else "User Guide",
+            if (isSpanish) "Aprende cómo usar la aplicación" else "Learn how to use the app") {
             showUserGuideDialog()
         }
 
-        addSettingsSection(dialogLayout, "❓ FAQ", "Frequently asked questions") {
+        addSettingsSection(dialogLayout,
+            if (isSpanish) "Preguntas Frecuentes" else "FAQ",
+            if (isSpanish) "Preguntas frecuentes" else "Frequently asked questions") {
             showFAQDialog()
         }
 
-        addSettingsSection(dialogLayout, "⚙️ Preferences", "App settings and preferences") {
+        addSettingsSection(dialogLayout,
+            if (isSpanish) "Preferencias" else "Preferences",
+            if (isSpanish) "Configuración de la aplicación" else "App settings and preferences") {
             showPreferencesDialog()
         }
 
-        addSettingsSection(dialogLayout, "🔒 Privacy Policy", "How we protect your data") {
+        addSettingsSection(dialogLayout,
+            if (isSpanish) "Política de Privacidad" else "Privacy Policy",
+            if (isSpanish) "Cómo protegemos tus datos" else "How we protect your data") {
             showPrivacyPolicyDialog()
         }
 
-        addSettingsSection(dialogLayout, "ℹ️ About", "About this app") {
+        addSettingsSection(dialogLayout,
+            if (isSpanish) "Acerca de" else "About",
+            if (isSpanish) "Acerca de esta aplicación" else "About this app") {
             showAboutDialog()
         }
 
-        // Close button
         val btnClose = Button(this).apply {
-            text = "CLOSE"
+            text = if (isSpanish) "CERRAR" else "CLOSE"
             setTextColor(Color.RED)
             setBackgroundColor(Color.TRANSPARENT)
             setPadding(32, 24, 32, 24)
@@ -1115,50 +1285,327 @@ class MainActivity : AppCompatActivity() {
         container.addView(sectionView)
     }
 
+    private fun showAlertDistanceDialog() {
+        val isSpanish = getSavedLanguage() == "es"
+
+        val dialogLayout = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(48, 48, 48, 48)
+            setBackgroundColor(Color.BLACK)
+        }
+
+        val titleText = TextView(this).apply {
+            text = if (isSpanish) "Distancia de Alerta" else "Alert Distance"
+            textSize = 20f
+            setTextColor(Color.WHITE)
+            gravity = android.view.Gravity.CENTER
+            setPadding(0, 0, 0, 24)
+            setTypeface(null, android.graphics.Typeface.BOLD)
+        }
+        dialogLayout.addView(titleText)
+
+        val descText = TextView(this).apply {
+            text = if (isSpanish)
+                "Elige qué tan lejos deben estar los reportes para alertarte:"
+            else
+                "Choose how far away reports should be to alert you:"
+            textSize = 14f
+            setTextColor(Color.parseColor("#CCCCCC"))
+            gravity = android.view.Gravity.CENTER
+            setPadding(0, 0, 0, 32)
+        }
+        dialogLayout.addView(descText)
+
+        val currentDistance = getSavedAlertDistance()
+
+        val options = if (isSpanish) {
+            listOf(
+                "1 milla" to ALERT_DISTANCE_1_MILE,
+                "2 millas" to ALERT_DISTANCE_2_MILES,
+                "3 millas" to ALERT_DISTANCE_3_MILES,
+                "5 millas" to ALERT_DISTANCE_5_MILES,
+                "Área de código postal" to ALERT_DISTANCE_ZIP_CODE,
+                "Todo el estado" to ALERT_DISTANCE_STATE
+            )
+        } else {
+            listOf(
+                "1 mile" to ALERT_DISTANCE_1_MILE,
+                "2 miles" to ALERT_DISTANCE_2_MILES,
+                "3 miles" to ALERT_DISTANCE_3_MILES,
+                "5 miles" to ALERT_DISTANCE_5_MILES,
+                "Zip code area" to ALERT_DISTANCE_ZIP_CODE,
+                "State-wide" to ALERT_DISTANCE_STATE
+            )
+        }
+
+        var selectedDistance = currentDistance
+        val optionViews = mutableListOf<LinearLayout>()
+
+        for ((label, distance) in options) {
+            val optionView = LinearLayout(this).apply {
+                orientation = LinearLayout.HORIZONTAL
+                setPadding(24, 16, 24, 16)
+                setBackgroundColor(if (distance == currentDistance) Color.parseColor("#2196F3") else Color.parseColor("#333333"))
+                isClickable = true
+                isFocusable = true
+
+                layoutParams = LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT,
+                    LinearLayout.LayoutParams.WRAP_CONTENT
+                ).apply {
+                    setMargins(0, 0, 0, 8)
+                }
+            }
+
+            val optionText = TextView(this).apply {
+                text = label
+                textSize = 16f
+                setTextColor(Color.WHITE)
+                gravity = android.view.Gravity.CENTER_VERTICAL
+                layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
+            }
+            optionView.addView(optionText)
+
+            val checkIcon = TextView(this).apply {
+                text = if (distance == currentDistance) "✓" else ""
+                textSize = 16f
+                setTextColor(Color.WHITE)
+                setTypeface(null, android.graphics.Typeface.BOLD)
+                gravity = android.view.Gravity.CENTER
+                layoutParams = LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.WRAP_CONTENT,
+                    LinearLayout.LayoutParams.WRAP_CONTENT
+                )
+            }
+            optionView.addView(checkIcon)
+
+            optionView.setOnClickListener {
+                selectedDistance = distance
+
+                for (i in optionViews.indices) {
+                    val view = optionViews[i]
+                    val isSelected = options[i].second == distance
+
+                    view.setBackgroundColor(
+                        if (isSelected) Color.parseColor("#2196F3")
+                        else Color.parseColor("#333333")
+                    )
+
+                    val checkView = view.getChildAt(1) as TextView
+                    checkView.text = if (isSelected) "✓" else ""
+                }
+            }
+
+            optionViews.add(optionView)
+            dialogLayout.addView(optionView)
+        }
+
+        val buttonLayout = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            setPadding(0, 32, 0, 0)
+            gravity = android.view.Gravity.CENTER
+        }
+
+        val btnCancel = Button(this).apply {
+            text = if (isSpanish) "CANCELAR" else "CANCEL"
+            setTextColor(Color.parseColor("#888888"))
+            setBackgroundColor(Color.TRANSPARENT)
+            setPadding(32, 16, 32, 16)
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.WRAP_CONTENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            ).apply {
+                setMargins(0, 0, 16, 0)
+            }
+        }
+
+        val btnSave = Button(this).apply {
+            text = if (isSpanish) "GUARDAR" else "SAVE"
+            setTextColor(Color.WHITE)
+            setBackgroundColor(Color.parseColor("#4CAF50"))
+            setPadding(32, 16, 32, 16)
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.WRAP_CONTENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            )
+        }
+
+        buttonLayout.addView(btnCancel)
+        buttonLayout.addView(btnSave)
+        dialogLayout.addView(buttonLayout)
+
+        val dialog = AlertDialog.Builder(this)
+            .setView(dialogLayout)
+            .setCancelable(true)
+            .create()
+
+        btnCancel.setOnClickListener { dialog.dismiss() }
+
+        btnSave.setOnClickListener {
+            saveAlertDistance(selectedDistance)
+            dialog.dismiss()
+
+            val distanceText = getAlertDistanceText(selectedDistance)
+            val confirmMessage = if (isSpanish)
+                "Distancia de alerta establecida en: $distanceText"
+            else
+                "Alert distance set to: $distanceText"
+            showStatusCard(confirmMessage, isLoading = false)
+
+            Handler(Looper.getMainLooper()).postDelayed({
+                hideStatusCard()
+            }, 3000)
+        }
+
+        dialog.show()
+    }
+
     private fun showUserGuideDialog() {
-        val content = """
-            📱 How to Use DerriteICE
+        val isSpanish = getSavedLanguage() == "es"
+
+        val content = if (isSpanish) {
+            """
+            Cómo Usar DerriteICE
             
-            🗺️ REPORTING
+            REPORTAR
+            • Presiona y mantén presionado en cualquier lugar del mapa para crear un reporte de seguridad
+            • Agrega una descripción de la situación
+            • Opcionalmente agrega una foto (los metadatos se eliminan automáticamente)
+            • Los reportes son completamente anónimos y expiran después de 8 horas
+            
+            ALERTAS
+            • Recibe notificaciones cuando se hagan reportes dentro de tu distancia elegida
+            • Personaliza la distancia de alerta: 1 milla, 2 millas, 3 millas, 5 millas, código postal, o todo el estado
+            • Cambia la distancia de alerta en Configuración → Preferencias → Distancia de Alerta
+            • Toca el botón de alertas para ver reportes cercanos
+            • Los reportes aparecen como círculos rojos en el mapa
+            
+            MAPA SATELITAL
+            • La aplicación usa imágenes satelitales para mejor contexto de ubicación
+            • La vista aérea ayuda a identificar puntos de referencia y terreno
+            • Mejor precisión para señalar ubicaciones exactas
+            
+            TRADUCCIÓN
+            • La aplicación funciona en español e inglés
+            • Toca el botón de idioma para cambiar entre idiomas
+            • Los reportes pueden ser traducidos tocando el botón traducir
+            
+            PRIVACIDAD
+            • No se requieren cuentas - completamente anónimo
+            • Los datos de ubicación se convierten en zonas anónimas
+            • Todos los datos expiran automáticamente después de 8 horas
+            • Las fotos tienen metadatos eliminados para privacidad
+            
+            UBICACIÓN
+            • Toca el botón de ubicación para centrar en tu posición
+            • Usa la barra de búsqueda para encontrar direcciones específicas
+            • Presiona y mantén presionado para reportar incidentes en cualquier ubicación
+            
+            CONFIGURACIÓN
+            • Accede a Configuración para personalizar la distancia de alerta
+            • Ve preguntas frecuentes, guía del usuario, y política de privacidad
+            • Verifica el estado de conexión del servidor
+        """.trimIndent()
+        } else {
+            """
+            How to Use DerriteICE
+            
+            REPORTING
             • Long press anywhere on the map to create a safety report
             • Add a description of the situation
             • Optionally add a photo (metadata is automatically removed)
             • Reports are completely anonymous and expire after 8 hours
             
-            🔔 ALERTS  
-            • Get notified when reports are made within 5 miles of your location
-            • Tap the alert button (🔔) to see nearby reports
+            ALERTS  
+            • Get notified when reports are made within your chosen distance
+            • Customize alert distance: 1 mile, 2 miles, 3 miles, 5 miles, zip code, or state-wide
+            • Change alert distance in Settings → Preferences → Alert Distance
+            • Tap the alert button to see nearby reports
             • Reports appear as red circles on the map
             
-            🌐 TRANSLATION
+            SATELLITE MAP
+            • App uses satellite imagery for better location context
+            • Aerial view helps identify landmarks and terrain
+            • Better precision for pinpointing exact locations
+            
+            TRANSLATION
             • App works in Spanish and English
             • Tap language button to switch between languages
             • Reports can be translated by tapping the translate button
             
-            🔒 PRIVACY
+            PRIVACY
             • No accounts required - completely anonymous
             • Location data is converted to anonymous zones
             • All data expires automatically after 8 hours
             • Photos have metadata stripped for privacy
             
-            📍 LOCATION
-            • Tap the location button (📍) to center on your position
+            LOCATION
+            • Tap the location button to center on your position
             • Use the search bar to find specific addresses
             • Long press to report incidents at any location
+            
+            SETTINGS
+            • Access Settings to customize alert distance
+            • View FAQs, user guide, and privacy policy
+            • Check backend connection status
         """.trimIndent()
+        }
 
-        showInfoDialog("📚 User Guide", content)
+        showInfoDialog(if (isSpanish) "Guía del Usuario" else "User Guide", content)
     }
 
     private fun showFAQDialog() {
-        val content = """
-            ❓ Frequently Asked Questions
+        val isSpanish = getSavedLanguage() == "es"
+
+        val content = if (isSpanish) {
+            """
+            Preguntas Frecuentes
+            
+            P: ¿Es esta aplicación anónima?
+            R: Sí, completamente. Sin cuentas, sin rastreo, sin datos personales almacenados.
+            
+            P: ¿Cuánto tiempo duran los reportes?
+            R: Todos los reportes expiran automáticamente y se eliminan después de 8 horas.
+            
+            P: ¿Puedo personalizar qué tan lejos vienen las alertas?
+            R: ¡Sí! Ve a Configuración → Preferencias → Distancia de Alerta para elegir entre 1 milla, 2 millas, 3 millas, 5 millas, área de código postal, o todo el estado.
+            
+            P: ¿Pueden otros ver mi ubicación?
+            R: No. Solo se usan zonas aproximadas (radio de 500m), nunca ubicaciones exactas.
+            
+            P: ¿Esto agota mi batería?
+            R: No. La aplicación está optimizada para uso mínimo de batería.
+            
+            P: ¿Qué pasa con las fotos que subo?
+            R: Todos los metadatos se eliminan antes de subir para completo anonimato.
+            
+            P: ¿Puedo usar esto sin internet?
+            R: Sí, la aplicación funciona sin conexión. Los reportes se sincronizan cuando regresa la conexión.
+            
+            P: ¿Es esta aplicación gratuita?
+            R: Sí, completamente gratuita sin anuncios o compras dentro de la aplicación.
+            
+            P: ¿Qué idiomas están soportados?
+            R: Actualmente español e inglés, con traducción automática.
+            
+            P: ¿Qué tan precisas son las alertas?
+            R: ¡Tú controlas la precisión! Establece alertas para 1 milla para incidentes muy locales, o todo el estado para mayor conciencia.
+            
+            P: ¿Pueden las autoridades rastrearme?
+            R: No. El sistema está diseñado para ser completamente imposible de rastrear.
+        """.trimIndent()
+        } else {
+            """
+            Frequently Asked Questions
             
             Q: Is this app anonymous?
             A: Yes, completely. No accounts, no tracking, no personal data stored.
             
             Q: How long do reports last?
             A: All reports automatically expire and delete after 8 hours.
+            
+            Q: Can I customize how far away alerts come from?
+            A: Yes! Go to Settings → Preferences → Alert Distance to choose from 1 mile, 2 miles, 3 miles, 5 miles, zip code area, or state-wide alerts.
             
             Q: Can others see my location?
             A: No. Only approximate zones (500m radius) are used, never exact locations.
@@ -1179,48 +1626,198 @@ class MainActivity : AppCompatActivity() {
             A: Currently Spanish and English, with automatic translation.
             
             Q: How accurate are the alerts?
-            A: Alerts cover a 5-mile radius around your location.
+            A: You control the accuracy! Set alerts for 1 mile for very local incidents, or state-wide for broader awareness.
             
             Q: Can law enforcement track me?
             A: No. The system is designed to be completely untraceable.
         """.trimIndent()
+        }
 
-        showInfoDialog("❓ FAQ", content)
+        showInfoDialog(if (isSpanish) "Preguntas Frecuentes" else "FAQ", content)
     }
 
     private fun showPreferencesDialog() {
-        val content = """
-            ⚙️ User Preferences
-            
-            🌐 LANGUAGE
-            Current: ${if (getSavedLanguage() == "es") "Spanish" else "English"}
-            Use the language toggle button to switch between Spanish and English.
-            
-            🔔 NOTIFICATIONS
-            Push notifications for nearby safety reports are automatically enabled.
-            
-            📍 LOCATION SERVICES
-            Required for receiving relevant safety alerts in your area.
-            
-            📱 OFFLINE MODE
-            Reports are saved locally when offline and sync when connection returns.
-            
-            🔒 PRIVACY LEVEL
-            Maximum - All data is anonymous and auto-deletes after 8 hours.
-            
-            ⚡ BACKGROUND REFRESH
-            Enabled for receiving real-time safety alerts.
-            
-            Note: This app is designed with privacy-first principles. 
-            All settings prioritize user anonymity and data protection.
-        """.trimIndent()
+        val isSpanish = getSavedLanguage() == "es"
 
-        showInfoDialog("⚙️ Preferences", content)
+        val dialogLayout = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(48, 48, 48, 48)
+            setBackgroundColor(Color.BLACK)
+        }
+
+        val titleText = TextView(this).apply {
+            text = if (isSpanish) "Preferencias de Usuario" else "User Preferences"
+            textSize = 20f
+            setTextColor(Color.WHITE)
+            gravity = android.view.Gravity.CENTER
+            setPadding(0, 0, 0, 24)
+            setTypeface(null, android.graphics.Typeface.BOLD)
+        }
+        dialogLayout.addView(titleText)
+
+        val currentLang = if (getSavedLanguage() == "es") {
+            if (isSpanish) "Español" else "Spanish"
+        } else {
+            if (isSpanish) "Inglés" else "English"
+        }
+
+        addPreferenceSection(dialogLayout,
+            if (isSpanish) "Idioma" else "Language",
+            if (isSpanish) "Actual: $currentLang" else "Current: $currentLang"
+        )
+
+        val currentAlertDistance = getAlertDistanceText(getSavedAlertDistance())
+        addPreferenceSection(dialogLayout,
+            if (isSpanish) "Distancia de Alerta" else "Alert Distance",
+            if (isSpanish)
+                "Recibir alertas de reportes dentro de: $currentAlertDistance"
+            else
+                "Get alerts for reports within: $currentAlertDistance"
+        ) {
+            showAlertDistanceDialog()
+        }
+
+        addPreferenceSection(dialogLayout,
+            if (isSpanish) "Servicios de Ubicación" else "Location Services",
+            if (isSpanish) "Requerido para alertas de seguridad" else "Required for safety alerts"
+        )
+
+        addPreferenceSection(dialogLayout,
+            if (isSpanish) "Nivel de Privacidad" else "Privacy Level",
+            if (isSpanish) "Máximo - Anónimo y auto-eliminación" else "Maximum - Anonymous & auto-delete"
+        )
+
+        addPreferenceSection(dialogLayout,
+            if (isSpanish) "Modo Sin Conexión" else "Offline Mode",
+            if (isSpanish) "Habilitado - Sincroniza al conectarse" else "Enabled - Syncs when online"
+        )
+
+        addPreferenceSection(dialogLayout,
+            if (isSpanish) "Actualización en Segundo Plano" else "Background Refresh",
+            if (isSpanish) "Habilitado para alertas en tiempo real" else "Enabled for real-time alerts"
+        )
+
+        val btnClose = Button(this).apply {
+            text = if (isSpanish) "CERRAR" else "CLOSE"
+            setTextColor(Color.RED)
+            setBackgroundColor(Color.TRANSPARENT)
+            setPadding(32, 24, 32, 24)
+
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.WRAP_CONTENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            ).apply {
+                gravity = android.view.Gravity.CENTER_HORIZONTAL
+                setMargins(0, 32, 0, 0)
+            }
+        }
+        dialogLayout.addView(btnClose)
+
+        val dialog = AlertDialog.Builder(this)
+            .setView(dialogLayout)
+            .setCancelable(true)
+            .create()
+
+        btnClose.setOnClickListener { dialog.dismiss() }
+        dialog.show()
+    }
+
+    private fun addPreferenceSection(container: LinearLayout, title: String, description: String, onClick: (() -> Unit)? = null) {
+        val sectionView = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(24, 20, 24, 20)
+            setBackgroundColor(if (onClick != null) Color.parseColor("#333333") else Color.parseColor("#222222"))
+
+            if (onClick != null) {
+                isClickable = true
+                isFocusable = true
+                setOnClickListener {
+                    animateButtonPress(this)
+                    onClick()
+                }
+            }
+
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            ).apply {
+                setMargins(0, 0, 0, 12)
+            }
+        }
+
+        val titleText = TextView(this).apply {
+            text = title
+            textSize = 16f
+            setTextColor(Color.WHITE)
+            setTypeface(null, android.graphics.Typeface.BOLD)
+        }
+        sectionView.addView(titleText)
+
+        val descriptionText = TextView(this).apply {
+            text = description
+            textSize = 14f
+            setTextColor(if (onClick != null) Color.parseColor("#CCCCCC") else Color.parseColor("#888888"))
+            setPadding(0, 6, 0, 0)
+        }
+        sectionView.addView(descriptionText)
+
+        if (onClick != null) {
+            val arrowText = TextView(this).apply {
+                text = ">"
+                textSize = 12f
+                setTextColor(Color.parseColor("#888888"))
+                gravity = android.view.Gravity.END
+                setPadding(0, 0, 0, 0)
+            }
+            sectionView.addView(arrowText)
+        }
+
+        container.addView(sectionView)
     }
 
     private fun showPrivacyPolicyDialog() {
-        val content = """
-            🔒 Privacy Policy
+        val isSpanish = getSavedLanguage() == "es"
+
+        val content = if (isSpanish) {
+            """
+            Política de Privacidad
+            
+            ANÓNIMO POR DISEÑO
+            • No se requieren cuentas de usuario o registro
+            • No se recopila ni almacena información personal
+            • Sin seguimiento o analíticas de ningún tipo
+            
+            PRIVACIDAD DE UBICACIÓN
+            • Las coordenadas GPS exactas nunca se almacenan
+            • Solo se usan zonas anónimas de 500m
+            • Los datos de ubicación expiran después de 8 horas
+            
+            PRIVACIDAD DE FOTOS
+            • Todos los metadatos se eliminan automáticamente
+            • No se preservan datos EXIF o información de ubicación
+            • Las imágenes se procesan de forma anónima
+            
+            ALMACENAMIENTO DE DATOS
+            • Todos los reportes se auto-eliminan después de 8 horas
+            • No hay almacenamiento permanente de datos de usuario
+            • Datos locales de la aplicación solo para funcionalidad sin conexión
+            
+            PRIVACIDAD DE RED
+            • Todas las conexiones usan cifrado HTTPS
+            • Enrutamiento Tor opcional para anonimato mejorado
+            • No se registran direcciones IP en los servidores
+            
+            PROTECCIÓN LEGAL
+            • No hay datos para subpoena o solicitud
+            • El sistema anónimo proporciona protección legal
+            • No se puede obligar a identificar usuarios
+            
+            Esta aplicación sigue principios de privacidad por diseño.
+            Tu seguridad y privacidad son nuestras principales prioridades.
+            """.trimIndent()
+        } else {
+            """
+            Privacy Policy
             
             ANONYMOUS BY DESIGN
             • No user accounts or registration required
@@ -1254,14 +1851,54 @@ class MainActivity : AppCompatActivity() {
             
             This app follows privacy-by-design principles.
             Your safety and privacy are our top priorities.
-        """.trimIndent()
+            """.trimIndent()
+        }
 
-        showInfoDialog("🔒 Privacy Policy", content)
+        showInfoDialog(if (isSpanish) "Política de Privacidad" else "Privacy Policy", content)
     }
 
     private fun showAboutDialog() {
-        val content = """
-            ℹ️ About DerriteICE
+        val isSpanish = getSavedLanguage() == "es"
+
+        val content = if (isSpanish) {
+            """
+            Acerca de DerriteICE
+            
+            MISIÓN
+            DerriteICE es una plataforma de reportes de seguridad anónima y privada, diseñada para ayudar a las comunidades a mantenerse informadas sobre problemas de seguridad locales.
+            
+            CARACTERÍSTICAS
+            • Reportes de seguridad anónimos
+            • Alertas en tiempo real para incidentes cercanos
+            • Multiplataforma (Android, iOS, Web)
+            • Soporte bilingüe (Español/Inglés)
+            • Traducción automática
+            • Protección completa de privacidad
+            
+            TECNOLOGÍA
+            • Infraestructura global en la nube
+            • Cifrado de extremo a extremo
+            • Zonas geográficas anónimas
+            • Expiración automática de datos
+            • Herramientas de privacidad de código abierto
+            
+            PRIVACIDAD PRIMERO
+            Construido desde cero con la privacidad como principio fundamental. Nunca se almacenan, rastrean o comparten datos de usuario.
+            
+            ALCANCE GLOBAL
+            Disponible en todo el mundo con soporte de idioma local y sensibilidad cultural.
+            
+            DIRIGIDO POR LA COMUNIDAD
+            Creado para las comunidades, por las comunidades. Tu seguridad es nuestra prioridad.
+            
+            Servidor: Railway Cloud (Global)
+            Versión: ${try { packageManager.getPackageInfo(packageName, 0).versionName } catch (e: Exception) { "1.0.0" }}
+            
+            Hecho con cuidado para comunidades más seguras.
+            """.trimIndent()
+        } else {
+            """
+            About DerriteICE
             
             MISSION
             DerriteICE is a privacy-first, anonymous safety reporting platform designed to help communities stay informed about local safety concerns.
@@ -1293,10 +1930,11 @@ class MainActivity : AppCompatActivity() {
             Backend: Railway Cloud (Global)
             Version: ${try { packageManager.getPackageInfo(packageName, 0).versionName } catch (e: Exception) { "1.0.0" }}
             
-            Made with ❤️ for safer communities.
-        """.trimIndent()
+            Made with care for safer communities.
+            """.trimIndent()
+        }
 
-        showInfoDialog("ℹ️ About DerriteICE", content)
+        showInfoDialog(if (isSpanish) "Acerca de DerriteICE" else "About DerriteICE", content)
     }
 
     private fun showInfoDialog(title: String, content: String) {
@@ -1337,7 +1975,7 @@ class MainActivity : AppCompatActivity() {
         dialogLayout.addView(scrollView)
 
         val btnClose = Button(this).apply {
-            text = "CLOSE"
+            text = if (getSavedLanguage() == "es") "CERRAR" else "CLOSE"
             setTextColor(Color.RED)
             setBackgroundColor(Color.TRANSPARENT)
             setPadding(32, 24, 32, 24)
@@ -1363,7 +2001,7 @@ class MainActivity : AppCompatActivity() {
 
     private fun subscribeToAlertsForLocation(latitude: Double, longitude: Double) {
         backendClient.subscribeToAlerts(latitude, longitude) { success, message ->
-            // Silent subscription - no UI feedback needed
+            // Silent subscription
         }
     }
 
@@ -1374,7 +2012,9 @@ class MainActivity : AppCompatActivity() {
             if (!query.isNullOrEmpty()) {
                 searchAddress(query)
             } else {
-                showStatusCard("Please enter an address", isError = true)
+                val message = if (getSavedLanguage() == "es")
+                    "Por favor ingresa una dirección" else "Please enter an address"
+                showStatusCard(message, isError = true)
             }
         }
 
@@ -1405,7 +2045,9 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun searchAddress(query: String) {
-        showStatusCard("Searching for address...", isLoading = true)
+        val message = if (getSavedLanguage() == "es")
+            "Buscando dirección..." else "Searching for address..."
+        showStatusCard(message, isLoading = true)
 
         val inputMethodManager = getSystemService(Context.INPUT_METHOD_SERVICE) as android.view.inputmethod.InputMethodManager
         inputMethodManager.hideSoftInputFromWindow(searchBar.windowToken, 0)
@@ -1421,18 +2063,26 @@ class MainActivity : AppCompatActivity() {
                 addSearchResultMarker(location, address)
 
                 val foundAddress = getFormattedAddress(address)
-                showStatusCard("Found: $foundAddress", isLoading = false)
+                val foundMessage = if (getSavedLanguage() == "es")
+                    "Encontrado: $foundAddress" else "Found: $foundAddress"
+                showStatusCard(foundMessage, isLoading = false)
 
                 Handler(Looper.getMainLooper()).postDelayed({
                     hideStatusCard()
                 }, 4000)
             } else {
-                showStatusCard("Address not found", isError = true)
+                val message = if (getSavedLanguage() == "es")
+                    "Dirección no encontrada" else "Address not found"
+                showStatusCard(message, isError = true)
             }
         } catch (e: IOException) {
-            showStatusCard("Search error", isError = true)
+            val message = if (getSavedLanguage() == "es")
+                "Error de búsqueda" else "Search error"
+            showStatusCard(message, isError = true)
         } catch (e: Exception) {
-            showStatusCard("Search error", isError = true)
+            val message = if (getSavedLanguage() == "es")
+                "Error de búsqueda" else "Search error"
+            showStatusCard(message, isError = true)
         }
     }
 
@@ -1478,42 +2128,107 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun addSearchResultMarker(location: GeoPoint, address: Address) {
-        currentSearchMarker?.let { marker ->
-            mapView.overlays.remove(marker)
-        }
-
-        currentSearchMarker = Marker(mapView).apply {
-            position = location
-            setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_BOTTOM)
-            icon = ContextCompat.getDrawable(this@MainActivity, R.drawable.ic_search_marker)
-            title = "Search Result"
-            snippet = getFormattedAddress(address)
-
-            alpha = 0f
-            ObjectAnimator.ofFloat(this, "alpha", 0f, 1f).apply {
-                duration = 500
-                interpolator = DecelerateInterpolator()
-                start()
+        try {
+            if (!::mapView.isInitialized || mapView.repository == null) {
+                Handler(Looper.getMainLooper()).postDelayed({
+                    addSearchResultMarker(location, address)
+                }, 500)
+                return
             }
-        }
 
-        mapView.overlays.add(currentSearchMarker)
-        mapView.invalidate()
+            currentSearchMarker?.let { marker ->
+                try {
+                    mapView.overlays.remove(marker)
+                } catch (e: Exception) {
+                    // Ignore removal errors
+                }
+            }
+
+            currentSearchMarker = Marker(mapView).apply {
+                position = location
+                setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_BOTTOM)
+                icon = ContextCompat.getDrawable(this@MainActivity, R.drawable.ic_search_marker)
+                title = "Search Result"
+                snippet = getFormattedAddress(address)
+
+                alpha = 0f
+                ObjectAnimator.ofFloat(this, "alpha", 0f, 1f).apply {
+                    duration = 500
+                    interpolator = DecelerateInterpolator()
+                    start()
+                }
+            }
+
+            mapView.overlays.add(currentSearchMarker)
+            mapView.invalidate()
+        } catch (e: Exception) {
+            android.util.Log.e("DerriteICE", "Error adding search marker: ${e.message}")
+            Handler(Looper.getMainLooper()).postDelayed({
+                try {
+                    addSearchResultMarker(location, address)
+                } catch (retryE: Exception) {
+                    // Give up if retry also fails
+                }
+            }, 1000)
+        }
     }
 
     private fun setupMap() {
-        mapView.apply {
-            setTileSource(TileSourceFactory.MAPNIK)
-            setMultiTouchControls(true)
-            setBuiltInZoomControls(false)
-            setFlingEnabled(true)
+        try {
+            mapView.apply {
+                setTileSource(getBestSatelliteSource())
+                setMultiTouchControls(true)
+                setBuiltInZoomControls(false)
+                setFlingEnabled(true)
+
+                isTilesScaledToDpi = false
+                isHorizontalMapRepetitionEnabled = false
+                isVerticalMapRepetitionEnabled = false
+
+                minZoomLevel = 5.0
+                maxZoomLevel = 19.0
+
+                addMapListener(object : org.osmdroid.events.MapListener {
+                    override fun onScroll(event: org.osmdroid.events.ScrollEvent?): Boolean {
+                        return true
+                    }
+
+                    override fun onZoom(event: org.osmdroid.events.ZoomEvent?): Boolean {
+                        val currentTime = System.currentTimeMillis()
+                        if (currentTime - lastZoomTime < zoomThrottleMs) {
+                            return true
+                        }
+                        lastZoomTime = currentTime
+                        return true
+                    }
+                })
+            }
+
+            val defaultPoint = GeoPoint(40.7128, -74.0060)
+            mapView.controller.setZoom(15.0)
+            mapView.controller.setCenter(defaultPoint)
+
+            setupMapLongPressListener()
+        } catch (e: Exception) {
+            android.util.Log.e("DerriteICE", "Error setting up map: ${e.message}")
+            try {
+                mapView.setTileSource(TileSourceFactory.MAPNIK)
+            } catch (fallbackE: Exception) {
+                android.util.Log.e("DerriteICE", "Fallback map setup also failed: ${fallbackE.message}")
+            }
         }
+    }
 
-        val defaultPoint = GeoPoint(40.7128, -74.0060)
-        mapView.controller.setZoom(15.0)
-        mapView.controller.setCenter(defaultPoint)
-
-        setupMapLongPressListener()
+    private fun getBestSatelliteSource(): org.osmdroid.tileprovider.tilesource.ITileSource {
+        return try {
+            TileSourceFactory.USGS_SAT
+        } catch (e: Exception) {
+            try {
+                TileSourceFactory.DEFAULT_TILE_SOURCE
+            } catch (e2: Exception) {
+                TileSourceFactory.MAPNIK
+            }
+        }
     }
 
     private fun autoLocateOnStartup() {
@@ -1525,7 +2240,9 @@ class MainActivity : AppCompatActivity() {
             }
         } else {
             if (hasLocationPermission()) {
-                showStatusCard("Finding your location...", isLoading = true)
+                val message = if (getSavedLanguage() == "es")
+                    "Encontrando tu ubicación..." else "Finding your location..."
+                showStatusCard(message, isLoading = true)
                 getCurrentLocationSilently(isStartup = true)
             } else {
                 hideStatusCard()
@@ -1562,19 +2279,25 @@ class MainActivity : AppCompatActivity() {
                     if (isStartup) {
                         hideStatusCard()
                     } else {
-                        showStatusCard("Unable to get location", isError = true)
+                        val message = if (getSavedLanguage() == "es")
+                            "No se puede obtener ubicación" else "Unable to get location"
+                        showStatusCard(message, isError = true)
                     }
                 }
             }.addOnFailureListener {
                 if (isStartup) {
                     hideStatusCard()
                 } else {
-                    showStatusCard("Location error", isError = true)
+                    val message = if (getSavedLanguage() == "es")
+                        "Error de ubicación" else "Location error"
+                    showStatusCard(message, isError = true)
                 }
             }
         } catch (e: SecurityException) {
             if (!isStartup) {
-                showStatusCard("Location permission needed", isError = true)
+                val message = if (getSavedLanguage() == "es")
+                    "Se necesita permiso de ubicación" else "Location permission needed"
+                showStatusCard(message, isError = true)
             }
         }
     }
@@ -1610,14 +2333,20 @@ class MainActivity : AppCompatActivity() {
                     }
                 }
 
-                showStatusCard("You are at: $locationText", isLoading = false)
+                val message = if (getSavedLanguage() == "es")
+                    "Estás en: $locationText" else "You are at: $locationText"
+                showStatusCard(message, isLoading = false)
             } else {
                 val coords = "${String.format("%.4f", location.latitude)}, ${String.format("%.4f", location.longitude)}"
-                showStatusCard("You are at: $coords", isLoading = false)
+                val message = if (getSavedLanguage() == "es")
+                    "Estás en: $coords" else "You are at: $coords"
+                showStatusCard(message, isLoading = false)
             }
         } catch (e: IOException) {
             val coords = "${String.format("%.4f", location.latitude)}, ${String.format("%.4f", location.longitude)}"
-            showStatusCard("You are at: $coords", isLoading = false)
+            val message = if (getSavedLanguage() == "es")
+                "Estás en: $coords" else "You are at: $coords"
+            showStatusCard(message, isLoading = false)
         }
 
         Handler(Looper.getMainLooper()).postDelayed({
@@ -1665,6 +2394,8 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun showReportConfirmDialog(location: GeoPoint) {
+        val isSpanish = getSavedLanguage() == "es"
+
         val dialogView = layoutInflater.inflate(R.layout.dialog_confirm_report, null)
         val dialog = AlertDialog.Builder(this)
             .setView(dialogView)
@@ -1673,6 +2404,9 @@ class MainActivity : AppCompatActivity() {
 
         val btnCancel = dialogView.findViewById<Button>(R.id.btn_cancel)
         val btnYesReport = dialogView.findViewById<Button>(R.id.btn_yes_report)
+
+        btnCancel.text = if (isSpanish) "Cancelar" else "Cancel"
+        btnYesReport.text = if (isSpanish) "Sí, Reportar" else "Yes, Report"
 
         btnCancel.setOnClickListener { dialog.dismiss() }
         btnYesReport.setOnClickListener {
@@ -1684,6 +2418,8 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun showReportInputDialog(location: GeoPoint) {
+        val isSpanish = getSavedLanguage() == "es"
+
         val dialogView = layoutInflater.inflate(R.layout.dialog_report_input, null)
         val dialog = AlertDialog.Builder(this)
             .setView(dialogView)
@@ -1695,6 +2431,15 @@ class MainActivity : AppCompatActivity() {
         val btnCancel = dialogView.findViewById<Button>(R.id.btn_cancel)
         val btnSubmit = dialogView.findViewById<Button>(R.id.btn_submit)
 
+        editReportText.hint = if (isSpanish)
+            "Describe la situación de seguridad..."
+        else
+            "Describe the safety situation..."
+
+        btnAddPhoto.text = if (isSpanish) "Agregar Foto" else "Add Photo"
+        btnCancel.text = if (isSpanish) "Cancelar" else "Cancel"
+        btnSubmit.text = if (isSpanish) "Enviar Reporte" else "Submit Report"
+
         currentPhoto = null
 
         btnAddPhoto.setOnClickListener { showPhotoSelectionDialog() }
@@ -1705,7 +2450,11 @@ class MainActivity : AppCompatActivity() {
         btnSubmit.setOnClickListener {
             val reportText = editReportText.text?.toString()?.trim()
             if (reportText.isNullOrEmpty()) {
-                showStatusCard("Please enter a description", isError = true)
+                val errorMsg = if (isSpanish)
+                    "Por favor ingresa una descripción"
+                else
+                    "Please enter a description"
+                showStatusCard(errorMsg, isError = true)
                 return@setOnClickListener
             }
 
@@ -1768,17 +2517,17 @@ class MainActivity : AppCompatActivity() {
             runOnUiThread {
                 if (success) {
                     val successMessage = if (getSavedLanguage() == "es") {
-                        "✅ Enviado al servidor"
+                        "Enviado al servidor"
                     } else {
-                        "✅ Sent to server"
+                        "Sent to server"
                     }
                     showStatusCard(successMessage, isLoading = false)
                     subscribeToAlertsForLocation(location.latitude, location.longitude)
                 } else {
                     val errorMessage = if (getSavedLanguage() == "es") {
-                        "❌ Error de conexión"
+                        "Error de conexión"
                     } else {
-                        "❌ Connection error"
+                        "Connection error"
                     }
                     showStatusCard(errorMessage, isError = true)
                 }
@@ -1875,7 +2624,7 @@ class MainActivity : AppCompatActivity() {
         dialogLayout.addView(textReportContent)
 
         val btnTranslate = Button(this).apply {
-            text = "🌐 TRANSLATE"
+            text = "TRANSLATE"
             textSize = 16f
             setBackgroundColor(Color.parseColor("#2196F3"))
             setTextColor(Color.WHITE)
@@ -1921,7 +2670,7 @@ class MainActivity : AppCompatActivity() {
 
             if (!isTranslated) {
                 isTranslating = true
-                btnTranslate.text = "⏳ Translating..."
+                btnTranslate.text = "Translating..."
                 btnTranslate.isEnabled = false
 
                 intelligentTranslate(
@@ -1931,7 +2680,7 @@ class MainActivity : AppCompatActivity() {
                     onSuccess = { translatedText ->
                         runOnUiThread {
                             textReportContent.text = translatedText
-                            btnTranslate.text = "📝 SHOW ORIGINAL"
+                            btnTranslate.text = "SHOW ORIGINAL"
                             btnTranslate.setBackgroundColor(Color.parseColor("#4CAF50"))
                             btnTranslate.isEnabled = true
                             isTranslated = true
@@ -1940,13 +2689,13 @@ class MainActivity : AppCompatActivity() {
                     },
                     onError = { error ->
                         runOnUiThread {
-                            btnTranslate.text = "❌ Translation Failed"
+                            btnTranslate.text = "Translation Failed"
                             btnTranslate.setBackgroundColor(Color.RED)
                             btnTranslate.isEnabled = true
                             isTranslating = false
 
                             Handler(Looper.getMainLooper()).postDelayed({
-                                btnTranslate.text = "🌐 TRANSLATE"
+                                btnTranslate.text = "TRANSLATE"
                                 btnTranslate.setBackgroundColor(Color.parseColor("#2196F3"))
                             }, 2000)
                         }
@@ -1954,7 +2703,7 @@ class MainActivity : AppCompatActivity() {
                 )
             } else {
                 textReportContent.text = report.originalText
-                btnTranslate.text = "🌐 TRANSLATE"
+                btnTranslate.text = "TRANSLATE"
                 btnTranslate.setBackgroundColor(Color.parseColor("#2196F3"))
                 isTranslated = false
             }
@@ -1970,46 +2719,74 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun startReportCleanupTimer() {
-        val cleanupRunnable = object : Runnable {
-            override fun run() {
-                val currentTime = System.currentTimeMillis()
-                val expiredReports = activeReports.filter { it.expiresAt < currentTime }
+        try {
+            val cleanupRunnable = object : Runnable {
+                override fun run() {
+                    try {
+                        val currentTime = System.currentTimeMillis()
+                        val expiredReports = activeReports.filter { it.expiresAt < currentTime }
 
-                if (expiredReports.isNotEmpty()) {
-                    expiredReports.forEach { report ->
-                        removeReportFromMap(report)
-                        activeReports.remove(report)
-                        activeAlerts.removeAll { it.report.id == report.id }
+                        if (expiredReports.isNotEmpty()) {
+                            expiredReports.forEach { report ->
+                                try {
+                                    removeReportFromMap(report)
+                                    activeReports.remove(report)
+                                    activeAlerts.removeAll { it.report.id == report.id }
+                                } catch (e: Exception) {
+                                    // Skip this report if cleanup fails
+                                }
+                            }
+                            saveReportsToPreferences()
+                        }
+
+                        val hasUnviewed = activeAlerts.any { !viewedAlertIds.contains(it.report.id) }
+                        updateAlertsButtonColor(hasUnviewed)
+
+                        Handler(Looper.getMainLooper()).postDelayed(this, 60 * 60 * 1000)
+                    } catch (e: Exception) {
+                        Handler(Looper.getMainLooper()).postDelayed(this, 60 * 60 * 1000)
                     }
-                    saveReportsToPreferences()
                 }
-
-                val hasUnviewed = activeAlerts.any { !viewedAlertIds.contains(it.report.id) }
-                updateAlertsButtonColor(hasUnviewed)
-
-                Handler(Looper.getMainLooper()).postDelayed(this, 60 * 60 * 1000)
             }
-        }
 
-        Handler(Looper.getMainLooper()).postDelayed(cleanupRunnable, 60 * 60 * 1000)
+            Handler(Looper.getMainLooper()).postDelayed(cleanupRunnable, 60 * 60 * 1000)
+        } catch (e: Exception) {
+            // If timer setup fails, continue without cleanup timer
+        }
     }
 
     private fun removeReportFromMap(report: Report) {
-        val markerToRemove = reportMarkers.find { marker ->
-            marker.position.latitude == report.location.latitude &&
-                    marker.position.longitude == report.location.longitude
-        }
-        markerToRemove?.let { marker ->
-            mapView.overlays.remove(marker)
-            reportMarkers.remove(marker)
-        }
+        try {
+            if (!::mapView.isInitialized || mapView.repository == null) {
+                return
+            }
 
-        if (reportCircles.isNotEmpty()) {
-            val circle = reportCircles.removeAt(0)
-            mapView.overlays.remove(circle)
-        }
+            val markerToRemove = reportMarkers.find { marker ->
+                marker.position.latitude == report.location.latitude &&
+                        marker.position.longitude == report.location.longitude
+            }
+            markerToRemove?.let { marker ->
+                try {
+                    mapView.overlays.remove(marker)
+                    reportMarkers.remove(marker)
+                } catch (e: Exception) {
+                    android.util.Log.e("DerriteICE", "Error removing marker: ${e.message}")
+                }
+            }
 
-        mapView.invalidate()
+            if (reportCircles.isNotEmpty()) {
+                try {
+                    val circle = reportCircles.removeAt(0)
+                    mapView.overlays.remove(circle)
+                } catch (e: Exception) {
+                    android.util.Log.e("DerriteICE", "Error removing circle: ${e.message}")
+                }
+            }
+
+            mapView.invalidate()
+        } catch (e: Exception) {
+            android.util.Log.e("DerriteICE", "Error in removeReportFromMap: ${e.message}")
+        }
     }
 
     private fun getTimeAgo(timestamp: Long): String {
@@ -2028,16 +2805,23 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun showPhotoSelectionDialog() {
-        val options = arrayOf("Take Photo", "Choose from Gallery")
+        val isSpanish = getSavedLanguage() == "es"
+
+        val options = if (isSpanish) {
+            arrayOf("Tomar Foto", "Elegir de Galería")
+        } else {
+            arrayOf("Take Photo", "Choose from Gallery")
+        }
+
         AlertDialog.Builder(this)
-            .setTitle("Add Photo")
+            .setTitle(if (isSpanish) "Agregar Foto" else "Add Photo")
             .setItems(options) { _, which ->
                 when (which) {
                     0 -> requestCameraPermissionAndCapture()
                     1 -> photoPickerLauncher.launch("image/*")
                 }
             }
-            .setNegativeButton("Cancel", null)
+            .setNegativeButton(if (isSpanish) "Cancelar" else "Cancel", null)
             .show()
     }
 
@@ -2088,31 +2872,55 @@ class MainActivity : AppCompatActivity() {
             return
         }
 
-        showStatusCard("Finding your location...", isLoading = true)
+        val message = if (getSavedLanguage() == "es")
+            "Encontrando tu ubicación..." else "Finding your location..."
+        showStatusCard(message, isLoading = true)
         getCurrentLocationSilently(isStartup = false)
     }
 
     private fun addLocationMarker(location: GeoPoint) {
-        currentLocationMarker?.let { marker ->
-            mapView.overlays.remove(marker)
-        }
-
-        currentLocationMarker = Marker(mapView).apply {
-            position = location
-            setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_BOTTOM)
-            icon = ContextCompat.getDrawable(this@MainActivity, R.drawable.ic_location_pin)
-            title = "Your Location"
-
-            alpha = 0f
-            ObjectAnimator.ofFloat(this, "alpha", 0f, 1f).apply {
-                duration = 500
-                interpolator = DecelerateInterpolator()
-                start()
+        try {
+            if (!::mapView.isInitialized || mapView.repository == null) {
+                Handler(Looper.getMainLooper()).postDelayed({
+                    addLocationMarker(location)
+                }, 500)
+                return
             }
-        }
 
-        mapView.overlays.add(currentLocationMarker)
-        mapView.invalidate()
+            currentLocationMarker?.let { marker ->
+                try {
+                    mapView.overlays.remove(marker)
+                } catch (e: Exception) {
+                    // Ignore removal errors
+                }
+            }
+
+            currentLocationMarker = Marker(mapView).apply {
+                position = location
+                setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_BOTTOM)
+                icon = ContextCompat.getDrawable(this@MainActivity, R.drawable.ic_location_pin)
+                title = "Your Location"
+
+                alpha = 0f
+                ObjectAnimator.ofFloat(this, "alpha", 0f, 1f).apply {
+                    duration = 500
+                    interpolator = DecelerateInterpolator()
+                    start()
+                }
+            }
+
+            mapView.overlays.add(currentLocationMarker)
+            mapView.invalidate()
+        } catch (e: Exception) {
+            android.util.Log.e("DerriteICE", "Error adding location marker: ${e.message}")
+            Handler(Looper.getMainLooper()).postDelayed({
+                try {
+                    addLocationMarker(location)
+                } catch (retryE: Exception) {
+                    // Give up if retry also fails
+                }
+            }, 1000)
+        }
     }
 
     private fun showStatusCard(message: String, isLoading: Boolean = false, isError: Boolean = false) {
@@ -2180,7 +2988,9 @@ class MainActivity : AppCompatActivity() {
                 LOCATION_PERMISSION_REQUEST
             )
         } else {
-            showStatusCard("Location permission needed", isError = true)
+            val message = if (getSavedLanguage() == "es")
+                "Se necesita permiso de ubicación" else "Location permission needed"
+            showStatusCard(message, isError = true)
         }
     }
 
@@ -2196,38 +3006,55 @@ class MainActivity : AppCompatActivity() {
                 if (grantResults.isNotEmpty() && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
                     getCurrentLocation()
                 } else {
-                    showStatusCard("Location permission required", isError = true)
+                    val message = if (getSavedLanguage() == "es")
+                        "Se requiere permiso de ubicación" else "Location permission required"
+                    showStatusCard(message, isError = true)
                 }
             }
             CAMERA_PERMISSION_REQUEST -> {
                 if (grantResults.isNotEmpty() && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
                     cameraLauncher.launch(null)
                 } else {
-                    showStatusCard("Camera permission needed", isError = true)
+                    val message = if (getSavedLanguage() == "es")
+                        "Se necesita permiso de cámara" else "Camera permission needed"
+                    showStatusCard(message, isError = true)
                 }
             }
         }
     }
 
-    override fun onResume() {
-        super.onResume()
-        mapView.onResume()
+    override fun onDestroy() {
+        try {
+            super.onDestroy()
+
+            if (::adaptiveTranslator.isInitialized) {
+                adaptiveTranslator.cleanup()
+            }
+            currentTranslationJob?.cancel()
+
+            mapView.onDetach()
+            currentAlertsDialog?.dismiss()
+        } catch (e: Exception) {
+            android.util.Log.e("DerriteICE", "Error in onDestroy: ${e.message}")
+        }
     }
 
     override fun onPause() {
-        super.onPause()
-        mapView.onPause()
+        try {
+            super.onPause()
+            mapView.onPause()
+            System.gc()
+        } catch (e: Exception) {
+            android.util.Log.e("DerriteICE", "Error in onPause: ${e.message}")
+        }
     }
 
-    override fun onDestroy() {
-        super.onDestroy()
-
-        if (::adaptiveTranslator.isInitialized) {
-            adaptiveTranslator.cleanup()
+    override fun onResume() {
+        try {
+            super.onResume()
+            mapView.onResume()
+        } catch (e: Exception) {
+            android.util.Log.e("DerriteICE", "Error in onResume: ${e.message}")
         }
-        currentTranslationJob?.cancel()
-
-        mapView.onDetach()
-        currentAlertsDialog?.dismiss()
     }
 }
