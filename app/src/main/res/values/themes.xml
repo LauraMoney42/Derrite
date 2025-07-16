@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources xmlns:tools="http://schemas.android.com/tools">
     <!-- Custom Theme - Black, White, Red -->
-    <style name="Theme.Derrite" parent="Theme.Material3.DayNight.NoActionBar">
+    <style name="Theme.pinlocal" parent="Theme.Material3.DayNight.NoActionBar">
         <!-- Primary colors -->
         <item name="colorPrimary">@color/primary</item>
         <item name="colorOnPrimary">@android:color/white</item>
@@ -36,5 +36,5 @@
     </style>
 
     <!-- NoActionBar variant -->
-    <style name="Theme.Derrite.NoActionBar" parent="Theme.Derrite" />
+    <style name="Theme.pinlocal.NoActionBar" parent="Theme.pinlocal" />
 </resources>
