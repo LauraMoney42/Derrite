@@ -3,44 +3,47 @@
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
     android:orientation="vertical"
-    android:padding="24dp">
+    android:padding="24dp"
+    android:background="@color/black">
 
     <TextView
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="@string/confirm_report_title"
+        android:text="Confirm Report"
+        android:textColor="@color/white"
         android:textSize="18sp"
         android:textStyle="bold"
+        android:gravity="center"
         android:layout_marginBottom="16dp" />
 
     <TextView
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="@string/confirm_report_message"
+        android:text="Create a report at this location?"
+        android:textColor="@color/white"
         android:textSize="14sp"
-        android:textColor="@color/text_secondary"
+        android:gravity="center"
         android:layout_marginBottom="24dp" />
 
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="horizontal"
-        android:gravity="end">
+        android:gravity="center">
 
         <Button
             android:id="@+id/btn_cancel"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="@string/cancel"
-            android:layout_marginEnd="8dp"
-            style="@style/Widget.Material3.Button.TextButton" />
+            android:text="Cancel"
+            android:layout_marginEnd="16dp" />
 
         <Button
             android:id="@+id/btn_yes_report"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="@string/yes_report"
-            style="@style/Widget.Material3.Button" />
+            android:text="Yes, Report"
+            android:backgroundTint="@color/primary" />
 
     </LinearLayout>
 

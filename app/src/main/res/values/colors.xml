@@ -29,6 +29,7 @@
     <!-- Optional: Colors for translation states -->
     <color name="translation_accent">#FF2196F3</color>
     <color name="original_text_accent">#FF757575</color>
+
     <!-- New Search UI Colors -->
     <color name="text_hint">#999999</color>
     <color name="icon_primary">#000000</color>
@@ -42,4 +43,24 @@
     <color name="transparent">#00000000</color>
     <color name="background_light">#1A1A1A</color>
 
+    <!-- NEW: Category Colors -->
+    <color name="category_safety">#FF0000</color>          <!-- Red -->
+    <color name="category_safety_light">#FFCDD2</color>    <!-- Light Red -->
+    <color name="category_safety_fill">#20FF0000</color>   <!-- Red with transparency -->
+    <color name="category_safety_stroke">#80FF0000</color> <!-- Red stroke -->
+
+    <color name="category_fun">#FFD700</color>             <!-- Gold/Yellow -->
+    <color name="category_fun_light">#FFF9C4</color>       <!-- Light Yellow -->
+    <color name="category_fun_fill">#20FFD700</color>      <!-- Yellow with transparency -->
+    <color name="category_fun_stroke">#80FFD700</color>    <!-- Yellow stroke -->
+
+    <color name="category_lost">#2196F3</color>            <!-- Blue -->
+    <color name="category_lost_light">#BBDEFB</color>      <!-- Light Blue -->
+    <color name="category_lost_fill">#202196F3</color>     <!-- Blue with transparency -->
+    <color name="category_lost_stroke">#802196F3</color>   <!-- Blue stroke -->
+
+    <!-- Category Text Colors for better contrast -->
+    <color name="category_safety_text">#FFFFFF</color>     <!-- White text on red -->
+    <color name="category_fun_text">#000000</color>        <!-- Black text on yellow -->
+    <color name="category_lost_text">#FFFFFF</color>       <!-- White text on blue -->
 </resources>

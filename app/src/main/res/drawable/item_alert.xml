@@ -4,69 +4,85 @@
     android:layout_height="wrap_content"
     android:orientation="vertical"
     android:padding="16dp"
-    android:background="@color/surface_variant"
+    android:background="@color/surface"
     android:layout_marginBottom="8dp">
 
+    <!-- Alert Header -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="horizontal"
-        android:gravity="center_vertical">
+        android:gravity="center_vertical"
+        android:layout_marginBottom="8dp">
 
+        <!-- New Alert Badge -->
         <View
             android:id="@+id/new_alert_badge"
-            android:layout_width="8dp"
-            android:layout_height="8dp"
-            android:background="@color/primary"
+            android:layout_width="12dp"
+            android:layout_height="12dp"
+            android:background="@drawable/alert_badge_background"
             android:layout_marginEnd="8dp" />
 
+        <!-- Distance -->
         <TextView
             android:id="@+id/text_alert_distance"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
-            android:text="500 ft away"
+            android:text="1.2 mi away"
             android:textColor="@color/text_primary"
-            android:textSize="12sp" />
+            android:textSize="14sp"
+            android:textStyle="bold" />
 
+        <!-- Time -->
         <TextView
             android:id="@+id/text_alert_time"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="5 minutes ago"
+            android:text="5 min ago"
             android:textColor="@color/text_secondary"
             android:textSize="12sp" />
 
     </LinearLayout>
 
+    <!-- Alert Content -->
     <TextView
         android:id="@+id/text_alert_content"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="Alert content goes here"
+        android:text="Alert content will appear here"
         android:textColor="@color/text_primary"
         android:textSize="14sp"
-        android:layout_marginTop="8dp"
-        android:layout_marginBottom="8dp" />
+        android:layout_marginBottom="8dp"
+        android:maxLines="3"
+        android:ellipsize="end" />
 
+    <!-- Photo Indicator -->
     <LinearLayout
         android:id="@+id/photo_indicator"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:orientation="horizontal"
         android:gravity="center_vertical"
-        android:layout_marginBottom="8dp"
+        android:layout_marginBottom="12dp"
         android:visibility="gone">
+
+        <ImageView
+            android:layout_width="16dp"
+            android:layout_height="16dp"
+            android:src="@drawable/ic_camera"
+            android:layout_marginEnd="4dp" />
 
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="📷 Photo"
+            android:text="Photo attached"
             android:textColor="@color/text_secondary"
             android:textSize="12sp" />
 
     </LinearLayout>
 
+    <!-- Action Buttons -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
@@ -78,15 +94,21 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:text="Details"
-            style="?android:attr/buttonBarButtonStyle"
-            android:layout_marginEnd="8dp" />
+            android:textColor="@color/primary"
+            android:background="@android:color/transparent"
+            android:layout_marginEnd="8dp"
+            android:paddingHorizontal="16dp"
+            android:paddingVertical="8dp" />
 
         <Button
             android:id="@+id/btn_view_on_map"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:text="View on Map"
-            style="?android:attr/buttonBarButtonStyle" />
+            android:textColor="@color/white"
+            android:background="@color/primary"
+            android:paddingHorizontal="16dp"
+            android:paddingVertical="8dp" />
 
     </LinearLayout>
 
