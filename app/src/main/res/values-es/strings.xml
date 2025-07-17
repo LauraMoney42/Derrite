@@ -17,6 +17,7 @@
     <string name="location_permission_required">Se requiere permiso de ubicación</string>
     <string name="distance_feet">A %1$d pies</string>
     <string name="distance_miles">A %1$s millas</string>
+
     <!-- Search -->
     <string name="search">Buscar</string>
     <string name="search_address">Buscar dirección o lugar...</string>
@@ -34,6 +35,7 @@
     <string name="report_sent_english">Reporte enviado en inglés</string>
     <string name="report_sent">Reporte enviado</string>
     <string name="now">Ahora</string>
+
     <!-- Reports -->
     <string name="safety_report">Reporte</string>
     <string name="report_created">Reporte creado anónimamente</string>
@@ -72,7 +74,6 @@
 
     <string name="back_button">Atrás</string>
 
-    <!-- Additional strings for res/values-es/strings.xml (Spanish) -->
     <!-- Alert System -->
     <string name="alerts">Alertas</string>
     <string name="alerts_in_your_area">Alertas en Tu Área</string>
@@ -113,5 +114,38 @@
 
     <!-- Instructions -->
     <string name="instruction_title">Reportes Anónimos</string>
-    <string name="instruction_description">Mantén presionado en cualquier lugar del mapa para crear un reporte anónimo</string>
+    <string name="instruction_description">Mantén presionado en cualquier lugar del mapa para crear un reporte anónimo o agregar un lugar favorito</string>
+
+    <!-- NUEVOS: Strings de Favoritos -->
+    <string name="favorites">Favoritos</string>
+    <string name="favorite_places">Lugares Favoritos</string>
+    <string name="add_favorite">Agregar Favorito</string>
+    <string name="add_favorite_place">Agregar Lugar Favorito</string>
+    <string name="edit_favorite">Editar Favorito</string>
+    <string name="remove_favorite">Eliminar Favorito</string>
+    <string name="favorite_name_hint">Nombre (ej. Escuela de Emma, Casa, Trabajo)</string>
+    <string name="favorite_alert_distance">Distancia de Alerta</string>
+    <string name="favorite_alert_types">Tipos de Alerta</string>
+    <string name="safety_alerts">Alertas de seguridad</string>
+    <string name="fun_alerts">Eventos divertidos</string>
+    <string name="lost_alerts">Objetos perdidos/desaparecidos</string>
+    <string name="save_favorite">Guardar Favorito</string>
+    <string name="no_favorite_places">Aún No Hay Lugares Favoritos</string>
+    <string name="add_places_description">Agrega lugares que te importan para recibir alertas cuando algo suceda cerca</string>
+    <string name="add_first_favorite">Agregar Tu Primer Favorito</string>
+    <string name="favorite_options">Opciones de Favorito</string>
+    <string name="view_favorite_alerts">Ver Alertas</string>
+    <string name="edit_favorite_settings">Editar Configuración</string>
+    <string name="delete_favorite">Eliminar Favorito</string>
+    <string name="confirm_delete_favorite">¿Eliminar este lugar favorito?</string>
+    <string name="favorite_deleted">Lugar favorito eliminado</string>
+    <string name="favorite_saved">Lugar favorito guardado</string>
+    <string name="favorite_updated">Lugar favorito actualizado</string>
+    <string name="please_enter_favorite_name">Por favor ingresa un nombre para este lugar favorito</string>
+    <string name="alerts_at_favorites">Alertas en Lugares Favoritos</string>
+    <string name="no_favorite_alerts">No hay alertas en tus lugares favoritos</string>
+    <string name="recent_alerts_count">%1$d alertas en las últimas 24 horas</string>
+    <string name="what_would_you_like_to_do">¿Qué te gustaría hacer?</string>
+    <string name="create_report">Crear Reporte</string>
+    <string name="add_to_favorites">Agregar a Favoritos</string>
 </resources>

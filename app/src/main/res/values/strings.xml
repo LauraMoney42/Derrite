@@ -22,6 +22,7 @@
     <string name="report_sent_english">Report sent in English</string>
     <string name="report_sent">Report sent</string>
     <string name="now">Now</string>
+
     <!-- Search -->
     <string name="search">Search</string>
     <string name="search_address">Search address or place...</string>
@@ -71,7 +72,6 @@
 
     <string name="back_button">Back</string>
 
-
     <!-- Alert System -->
     <string name="alerts">Alerts</string>
     <string name="alerts_in_your_area">Alerts in Your Area</string>
@@ -115,5 +115,38 @@
 
     <!-- Instructions -->
     <string name="instruction_title">Anonymous Reporting</string>
-    <string name="instruction_description">Long press anywhere on the map to create an anonymous report</string>
+    <string name="instruction_description">Long press anywhere on the map to create an anonymous report or add a favorite place</string>
+
+    <!-- NEW: Favorites Strings -->
+    <string name="favorites">Favorites</string>
+    <string name="favorite_places">Favorite Places</string>
+    <string name="add_favorite">Add Favorite</string>
+    <string name="add_favorite_place">Add Favorite Place</string>
+    <string name="edit_favorite">Edit Favorite</string>
+    <string name="remove_favorite">Remove Favorite</string>
+    <string name="favorite_name_hint">Name (e.g., Emma\'s School, Home, Work)</string>
+    <string name="favorite_alert_distance">Alert Distance</string>
+    <string name="favorite_alert_types">Alert Types</string>
+    <string name="safety_alerts">Safety alerts</string>
+    <string name="fun_alerts">Fun events</string>
+    <string name="lost_alerts">Lost/Missing items</string>
+    <string name="save_favorite">Save Favorite</string>
+    <string name="no_favorite_places">No Favorite Places Yet</string>
+    <string name="add_places_description">Add places you care about to get alerts when something happens nearby</string>
+    <string name="add_first_favorite">Add Your First Favorite</string>
+    <string name="favorite_options">Favorite Options</string>
+    <string name="view_favorite_alerts">View Alerts</string>
+    <string name="edit_favorite_settings">Edit Settings</string>
+    <string name="delete_favorite">Delete Favorite</string>
+    <string name="confirm_delete_favorite">Delete this favorite place?</string>
+    <string name="favorite_deleted">Favorite place deleted</string>
+    <string name="favorite_saved">Favorite place saved</string>
+    <string name="favorite_updated">Favorite place updated</string>
+    <string name="please_enter_favorite_name">Please enter a name for this favorite place</string>
+    <string name="alerts_at_favorites">Alerts at Favorite Places</string>
+    <string name="no_favorite_alerts">No alerts at your favorite places</string>
+    <string name="recent_alerts_count">%1$d alerts in the last 24 hours</string>
+    <string name="what_would_you_like_to_do">What would you like to do?</string>
+    <string name="create_report">Create Report</string>
+    <string name="add_to_favorites">Add to Favorites</string>
 </resources>

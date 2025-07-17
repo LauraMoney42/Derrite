@@ -57,7 +57,11 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
-
+        <activity
+            android:name=".FavoritesActivity"
+            android:exported="false"
+            android:label="Favorites"
+            android:theme="@style/Theme.pinlocal" />
     </application>
 
 </manifest>

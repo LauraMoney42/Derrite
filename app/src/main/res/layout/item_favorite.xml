@@ -1,0 +1,119 @@
+<?xml version="1.0" encoding="utf-8"?>
+<com.google.android.material.card.MaterialCardView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:layout_margin="8dp"
+    app:cardCornerRadius="12dp"
+    app:cardElevation="2dp"
+    app:cardBackgroundColor="@color/white">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:padding="16dp">
+
+        <!-- Header with name and options -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:layout_marginBottom="8dp">
+
+            <!-- Pink heart icon -->
+            <ImageView
+                android:layout_width="24dp"
+                android:layout_height="24dp"
+                android:src="@drawable/ic_favorite_pin"
+                android:layout_marginEnd="12dp" />
+
+            <!-- Favorite name -->
+            <TextView
+                android:id="@+id/text_favorite_name"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="Emma's School"
+                android:textColor="@color/text_primary"
+                android:textSize="16sp"
+                android:textStyle="bold" />
+
+            <!-- New alerts badge -->
+            <View
+                android:id="@+id/new_alerts_badge"
+                android:layout_width="12dp"
+                android:layout_height="12dp"
+                android:background="@drawable/alert_badge_background"
+                android:layout_marginEnd="8dp"
+                android:visibility="gone" />
+
+            <!-- Options menu -->
+            <ImageButton
+                android:id="@+id/btn_favorite_options"
+                android:layout_width="32dp"
+                android:layout_height="32dp"
+                android:src="@android:drawable/ic_menu_more"
+                android:background="?attr/selectableItemBackgroundBorderless"
+                android:contentDescription="Options" />
+
+        </LinearLayout>
+
+        <!-- Alert settings summary -->
+        <TextView
+            android:id="@+id/text_alert_settings"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Safety, Lost alerts • 1 mile"
+            android:textColor="@color/text_secondary"
+            android:textSize="12sp"
+            android:layout_marginBottom="8dp" />
+
+        <!-- Recent alerts count -->
+        <TextView
+            android:id="@+id/text_recent_alerts"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="2 alerts in the last 24 hours"
+            android:textColor="@color/primary"
+            android:textSize="12sp"
+            android:textStyle="bold"
+            android:visibility="gone" />
+
+        <!-- Action buttons -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="end"
+            android:layout_marginTop="8dp">
+
+            <Button
+                android:id="@+id/btn_view_alerts"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="View Alerts"
+                android:textColor="@color/primary"
+                android:background="@android:color/transparent"
+                android:layout_marginEnd="8dp"
+                android:paddingHorizontal="12dp"
+                android:paddingVertical="6dp"
+                android:textSize="12sp" />
+
+            <Button
+                android:id="@+id/btn_view_on_map"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="View on Map"
+                android:textColor="@color/white"
+                android:backgroundTint="@color/primary"
+                android:paddingHorizontal="12dp"
+                android:paddingVertical="6dp"
+                android:textSize="12sp" />
+
+        </LinearLayout>
+
+    </LinearLayout>
+
+</com.google.android.material.card.MaterialCardView>
