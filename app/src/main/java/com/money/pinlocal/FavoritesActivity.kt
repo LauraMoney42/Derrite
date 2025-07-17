@@ -1,4 +1,4 @@
-// File: FavoritesActivity.kt
+// File: FavoritesActivity.kt - COMPLETE CORRECTED VERSION
 package com.money.pinlocal
 
 import android.os.Bundle
@@ -62,7 +62,10 @@ class FavoritesActivity : AppCompatActivity(), FavoriteManager.FavoriteListener 
             setTextColor(ContextCompat.getColor(this@FavoritesActivity, android.R.color.white))
             setBackgroundColor(ContextCompat.getColor(this@FavoritesActivity, android.R.color.transparent))
             setPadding(0, 16, 0, 32)
-            setOnClickListener { finish() }
+            setOnClickListener {
+                setResult(RESULT_OK) // Set result when user goes back
+                finish()
+            }
         }
         mainLayout.addView(backButton)
 
@@ -181,6 +184,7 @@ class FavoritesActivity : AppCompatActivity(), FavoriteManager.FavoriteListener 
             }
             setOnClickListener {
                 // For now, just finish activity - could implement edit functionality
+                setResult(RESULT_OK) // Set result when user makes changes
                 finish()
             }
         }
@@ -191,7 +195,38 @@ class FavoritesActivity : AppCompatActivity(), FavoriteManager.FavoriteListener 
             setBackgroundColor(ContextCompat.getColor(this@FavoritesActivity, android.R.color.holo_red_dark))
             setPadding(16, 8, 16, 8)
             setOnClickListener {
-                favoriteManager.removeFavorite(favorite.id)
+                try {
+                    android.util.Log.d("FavoritesActivity", "=== DELETE BUTTON CLICKED ===")
+                    android.util.Log.d("FavoritesActivity", "Deleting favorite: ${favorite.name} (ID: ${favorite.id})")
+
+                    val isSpanish = preferencesManager.getSavedLanguage() == "es"
+                    android.app.AlertDialog.Builder(this@FavoritesActivity)
+                        .setTitle(if (isSpanish) "Eliminar Favorito" else "Delete Favorite")
+                        .setMessage(if (isSpanish) "¿Eliminar '${favorite.name}'?" else "Delete '${favorite.name}'?")
+                        .setPositiveButton(if (isSpanish) "Eliminar" else "Delete") { _, _ ->
+                            android.util.Log.d("FavoritesActivity", "User confirmed deletion")
+
+                            val success = favoriteManager.removeFavorite(favorite.id)
+                            android.util.Log.d("FavoritesActivity", "FavoriteManager.removeFavorite result: $success")
+
+                            if (success) {
+                                android.util.Log.d("FavoritesActivity", "Successfully deleted, refreshing UI")
+
+                                // Set result to indicate favorites changed
+                                setResult(RESULT_OK)
+
+                                // Force refresh the favorites list UI
+                                loadFavorites()
+                            } else {
+                                android.util.Log.e("FavoritesActivity", "Failed to delete favorite")
+                            }
+                        }
+                        .setNegativeButton(if (isSpanish) "Cancelar" else "Cancel", null)
+                        .show()
+
+                } catch (e: Exception) {
+                    android.util.Log.e("FavoritesActivity", "Error in delete button: ${e.message}")
+                }
             }
         }
 
@@ -200,5 +235,29 @@ class FavoritesActivity : AppCompatActivity(), FavoriteManager.FavoriteListener 
         card.addView(buttonLayout)
 
         return card
+    }
+
+    override fun onDestroy() {
+        super.onDestroy()
+
+        try {
+            android.util.Log.d("FavoritesActivity", "onDestroy - triggering favorites refresh")
+
+            // Clear the listener to avoid memory leaks
+            favoriteManager.setFavoriteListener(null)
+
+            // Always set result to ensure MainActivity refreshes
+            setResult(RESULT_OK)
+
+        } catch (e: Exception) {
+            android.util.Log.e("FavoritesActivity", "Error in onDestroy: ${e.message}")
+        }
+    }
+
+    override fun onBackPressed() {
+        super.onBackPressed()
+
+        // Set result when user presses back button too
+        setResult(RESULT_OK)
     }
 }

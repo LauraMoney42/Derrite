@@ -1,7 +1,6 @@
 // File: MainActivity.kt (Fixed - Auto-hide instruction overlay)
 package com.money.pinlocal
 
-import com.money.pinlocal.BackendClient
 import android.Manifest
 import android.animation.ObjectAnimator
 import android.app.AlertDialog
@@ -10,7 +9,6 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import android.graphics.Bitmap
 import android.graphics.Color
-import android.location.Address
 import android.location.Location
 import android.os.Build
 import android.os.Bundle
@@ -25,7 +23,6 @@ import android.widget.Button
 import android.widget.ImageButton
 import android.widget.LinearLayout
 import android.widget.TextView
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
@@ -132,6 +129,8 @@ class MainActivity : AppCompatActivity(),
         setupInstructionOverlay()  // NEW: Setup instruction overlay
     }
 
+// Update MainActivity.kt - Subscribe to favorites on startup:
+
     private fun initializeApp() {
         // Load saved data
         alertManager.loadViewedAlerts()
@@ -144,15 +143,62 @@ class MainActivity : AppCompatActivity(),
                 translationManager.initialize()
                 autoLocateOnStartup()
                 startTimers()
+
+                // Subscribe to all saved favorites for background notifications
                 favoriteManager.subscribeToAllFavorites()
 
-                // NEW: Auto-hide instruction overlay after delay if no interaction
                 scheduleInstructionOverlayAutoHide()
             } catch (e: Exception) {
                 android.util.Log.e("PinLocal", "Error in delayed initialization: ${e.message}")
             }
         }, 1000)
     }
+
+    // Keep the createReport method with favorite alert checking:
+    private fun createReport(location: GeoPoint, text: String, photo: Bitmap?, category: ReportCategory) {
+        val detectedLanguage = translationManager.detectLanguage(text)
+        val report = reportManager.createReport(location, text, detectedLanguage, photo, category)
+
+        mapManager.addReportToMap(mapView, report, this)
+        preferencesManager.setUserHasCreatedReports(true)
+
+        val message = if (preferencesManager.getSavedLanguage() == "es") {
+            "Enviando al servidor..."
+        } else {
+            "Sending to server..."
+        }
+        showStatusCard(message, isLoading = true)
+
+        backendClient.submitReport(
+            latitude = location.latitude,
+            longitude = location.longitude,
+            content = text,
+            language = detectedLanguage,
+            hasPhoto = photo != null,
+            category = category
+        ) { success: Boolean, message: String ->
+            runOnUiThread {
+                val resultMessage = if (success) {
+                    if (preferencesManager.getSavedLanguage() == "es") "Enviado al servidor"
+                    else "Sent to server"
+                } else {
+                    if (preferencesManager.getSavedLanguage() == "es") "Error de conexión"
+                    else "Connection error"
+                }
+                showStatusCard(resultMessage, isError = !success)
+
+                if (success) {
+                    subscribeToAlertsForLocation(location.latitude, location.longitude)
+
+                    // Check if this new report affects any favorites
+                    favoriteManager.checkForFavoriteAlerts()
+                }
+
+                Handler(Looper.getMainLooper()).postDelayed({ hideStatusCard() }, 3000)
+            }
+        }
+    }
+
 
     private fun setupViews() {
         mapView = findViewById(R.id.mapView)
@@ -170,6 +216,64 @@ class MainActivity : AppCompatActivity(),
         instructionOverlay = findViewById(R.id.instruction_overlay)  // NEW: Get instruction overlay reference
     }
 
+    private fun setupManagers() {
+        preferencesManager = PreferencesManager(this)
+        reportManager = ReportManager(preferencesManager)
+        locationManager = LocationManager(this)
+        mapManager = MapManager(this)
+        alertManager = AlertManager(preferencesManager, reportManager, locationManager)
+        photoManager = PhotoManager(this, preferencesManager)
+        backendClient = BackendClient()
+        favoriteManager = FavoriteManager(preferencesManager, reportManager, locationManager, backendClient)
+        dialogManager = DialogManager(this, preferencesManager)
+        translationManager = TranslationManager(this)
+
+        // Set listeners
+        alertManager.setAlertListener(this)
+
+        // CRITICAL: Ensure favorite listener is set up with logging
+        android.util.Log.d("MainActivity", "Setting up FavoriteListener")
+        favoriteManager.setFavoriteListener(this)
+        android.util.Log.d("MainActivity", "FavoriteListener set up successfully")
+    }
+
+    // Also update the onFavoritesUpdated method with additional debugging:
+    override fun onFavoritesUpdated(favorites: List<FavoritePlace>) {
+        android.util.Log.d("MainActivity", "=== onFavoritesUpdated CALLED ===")
+        android.util.Log.d("MainActivity", "Thread: ${Thread.currentThread().name}")
+        android.util.Log.d("MainActivity", "Received ${favorites.size} favorites")
+
+        // Log each favorite received
+        favorites.forEachIndexed { index, favorite ->
+            android.util.Log.d("MainActivity", "Favorite $index: ${favorite.name} (ID: ${favorite.id})")
+        }
+
+        runOnUiThread {
+            try {
+                // Clear ALL existing favorite markers first
+                android.util.Log.d("MainActivity", "Clearing all favorite markers from map")
+                mapManager.clearFavoriteMarkers(mapView)
+
+                // Add all current favorites back to map
+                android.util.Log.d("MainActivity", "Adding ${favorites.size} favorites back to map")
+                favorites.forEach { favorite ->
+                    android.util.Log.d("MainActivity", "Adding favorite to map: ${favorite.name}")
+                    mapManager.addFavoriteToMap(mapView, favorite, this)
+                }
+
+                // Force map refresh
+                mapView.post {
+                    mapView.invalidate()
+                    android.util.Log.d("MainActivity", "Map invalidated and refreshed")
+                }
+
+                android.util.Log.d("MainActivity", "=== onFavoritesUpdated COMPLETED ===")
+
+            } catch (e: Exception) {
+                android.util.Log.e("MainActivity", "Error updating favorites on map: ${e.message}")
+            }
+        }
+    }
     // NEW: Setup instruction overlay behavior
     private fun setupInstructionOverlay() {
         // Check if user has created reports before
@@ -301,14 +405,6 @@ class MainActivity : AppCompatActivity(),
         updateAlertsButtonColor(hasUnviewed)
     }
 
-    // FavoriteManager.FavoriteListener Implementation
-    override fun onFavoritesUpdated(favorites: List<FavoritePlace>) {
-        mapManager.clearFavoriteMarkers(mapView)
-        favorites.forEach { favorite ->
-            mapManager.addFavoriteToMap(mapView, favorite, this)
-        }
-    }
-
     override fun onFavoriteAlertsUpdated(alerts: List<FavoriteAlert>, hasUnviewed: Boolean) {
         updateFavoritesButtonColor(hasUnviewed)
     }
@@ -374,11 +470,6 @@ class MainActivity : AppCompatActivity(),
             .show()
     }
 
-    private fun openFavoritesScreen() {
-        val intent = Intent(this, FavoritesActivity::class.java)
-        startActivity(intent)
-    }
-
     private fun showReportInputDialog(location: GeoPoint) {
         dialogManager.showReportInputDialog(
             location = location,
@@ -393,50 +484,6 @@ class MainActivity : AppCompatActivity(),
                 createReport(reportLocation, text, photo, category)
             }
         )
-    }
-
-    private fun createReport(location: GeoPoint, text: String, photo: Bitmap?, category: ReportCategory) {
-        val detectedLanguage = translationManager.detectLanguage(text)
-        val report = reportManager.createReport(location, text, detectedLanguage, photo, category)
-
-        mapManager.addReportToMap(mapView, report, this)
-
-        // NEW: Mark that user has created reports
-        preferencesManager.setUserHasCreatedReports(true)
-
-        val message = if (preferencesManager.getSavedLanguage() == "es") {
-            "Enviando al servidor..."
-        } else {
-            "Sending to server..."
-        }
-        showStatusCard(message, isLoading = true)
-
-        backendClient.submitReport(
-            latitude = location.latitude,
-            longitude = location.longitude,
-            content = text,
-            language = detectedLanguage,
-            hasPhoto = photo != null,
-            category = category
-        ) { success: Boolean, message: String ->
-            runOnUiThread {
-                val resultMessage = if (success) {
-                    if (preferencesManager.getSavedLanguage() == "es") "Enviado al servidor"
-                    else "Sent to server"
-                } else {
-                    if (preferencesManager.getSavedLanguage() == "es") "Error de conexión"
-                    else "Connection error"
-                }
-                showStatusCard(resultMessage, isError = !success)
-
-                if (success) {
-                    subscribeToAlertsForLocation(location.latitude, location.longitude)
-                    favoriteManager.checkForFavoriteAlerts()
-                }
-
-                Handler(Looper.getMainLooper()).postDelayed({ hideStatusCard() }, 3000)
-            }
-        }
     }
 
     private fun updateAlertsButtonColor(hasUnviewedAlerts: Boolean) {
@@ -814,12 +861,80 @@ class MainActivity : AppCompatActivity(),
         }
     }
 
+
     override fun onResume() {
         super.onResume()
         try {
             mapView.onResume()
+
+            // CRITICAL: Add delay to refresh favorites when returning to MainActivity
+            // This ensures any deletion operations are fully complete before refreshing
+            android.util.Log.d("MainActivity", "onResume - scheduling favorites refresh")
+            Handler(Looper.getMainLooper()).postDelayed({
+                android.util.Log.d("MainActivity", "onResume - refreshing favorites on map")
+                refreshFavoritesOnMap()
+            }, 200) // Small delay to ensure deletion is complete
+
         } catch (e: Exception) {
-            android.util.Log.e("PinLocal", "Error in onResume: ${e.message}")
+            android.util.Log.e("MainActivity", "Error in onResume: ${e.message}")
+        }
+    }
+
+    private fun refreshFavoritesOnMap() {
+        try {
+            android.util.Log.d("MainActivity", "=== REFRESHING FAVORITES ON MAP ===")
+
+            // CRITICAL FIX: Reload favorites from preferences first
+            favoriteManager.loadSavedData()
+
+            // Get current favorites from manager
+            val currentFavorites = favoriteManager.getFavorites()
+            android.util.Log.d("MainActivity", "Current favorites count: ${currentFavorites.size}")
+
+            // Clear all existing favorite markers
+            mapManager.clearFavoriteMarkers(mapView)
+
+            // Add all current favorites back to map
+            currentFavorites.forEach { favorite ->
+                android.util.Log.d("MainActivity", "Adding favorite to map: ${favorite.name}")
+                mapManager.addFavoriteToMap(mapView, favorite, this)
+            }
+
+            // Force map refresh
+            mapView.invalidate()
+
+            android.util.Log.d("MainActivity", "=== REFRESH FAVORITES COMPLETED ===")
+
+        } catch (e: Exception) {
+            android.util.Log.e("MainActivity", "Error refreshing favorites on map: ${e.message}")
+        }
+    }
+    companion object {
+        private const val FAVORITES_ACTIVITY_REQUEST = 1001
+    }
+
+    // Update the openFavoritesScreen method in MainActivity.kt:
+    private fun openFavoritesScreen() {
+        val intent = Intent(this, FavoritesActivity::class.java)
+        startActivityForResult(intent, FAVORITES_ACTIVITY_REQUEST)
+    }
+
+    // Add this method to MainActivity.kt:
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        super.onActivityResult(requestCode, resultCode, data)
+
+        when (requestCode) {
+            FAVORITES_ACTIVITY_REQUEST -> {
+                if (resultCode == RESULT_OK) {
+                    android.util.Log.d("MainActivity", "Returned from FavoritesActivity - favorites may have changed")
+
+                    // Force refresh favorites on map
+                    refreshFavoritesOnMap()
+
+                    // Also re-register the listener in case it was cleared
+                    favoriteManager.setFavoriteListener(this)
+                }
+            }
         }
     }
 }

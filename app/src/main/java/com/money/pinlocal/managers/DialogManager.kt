@@ -512,6 +512,7 @@ class DialogManager(
     }
 
 
+// Update DialogManager.kt - Simple add favorite dialog (no privacy toggle):
 
     fun showAddFavoriteDialog(location: GeoPoint, favoriteManager: FavoriteManager) {
         val isSpanish = preferencesManager.getSavedLanguage() == "es"
@@ -534,7 +535,7 @@ class DialogManager(
 
         // Name input
         val nameInput = TextInputEditText(context).apply {
-            hint = if (isSpanish) "Nombre del lugar" else "Place name"
+            hint = if (isSpanish) "Nombre (ej. Escuela de Emma, Casa, Trabajo)" else "Name (e.g., Emma's School, Home, Work)"
             setTextColor(Color.WHITE)
             setHintTextColor(Color.parseColor("#888888"))
             setBackgroundColor(Color.parseColor("#333333"))
@@ -563,6 +564,25 @@ class DialogManager(
             }
         }
         dialogLayout.addView(descriptionInput)
+
+        // Info text about background notifications
+        val infoText = TextView(context).apply {
+            text = if (isSpanish)
+                "💡 Recibirás alertas para este lugar incluso cuando la app esté cerrada"
+            else
+                "💡 You'll receive alerts for this place even when the app is closed"
+            textSize = 12f
+            setTextColor(Color.parseColor("#CCCCCC"))
+            setPadding(12, 12, 12, 16)
+            setBackgroundColor(Color.parseColor("#333333"))
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            ).apply {
+                setMargins(0, 0, 0, 16)
+            }
+        }
+        dialogLayout.addView(infoText)
 
         // Buttons
         val buttonLayout = LinearLayout(context).apply {
@@ -613,20 +633,25 @@ class DialogManager(
 
             val description = descriptionInput.text?.toString()?.trim() ?: ""
 
+            // Create favorite with background notifications enabled
             val favoritePlace = favoriteManager.createFavoriteFromLocation(
                 location = location,
                 name = name,
                 description = description,
-                categories = setOf(ReportCategory.SAFETY),
-                alertDistance = 1609.0
+                categories = setOf(ReportCategory.SAFETY), // Default to safety alerts
+                alertDistance = 1609.0 // 1 mile default
             )
 
             favoriteManager.addFavorite(favoritePlace)
             dialog.dismiss()
+
+            // Show confirmation
+            android.util.Log.d("DialogManager", "Added favorite: $name with background notifications")
         }
 
         dialog.show()
     }
+
     fun showCategorySelectionDialog(onCategorySelected: (ReportCategory) -> Unit) {
         val isSpanish = preferencesManager.getSavedLanguage() == "es"
 

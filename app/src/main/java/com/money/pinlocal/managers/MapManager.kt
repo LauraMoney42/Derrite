@@ -237,7 +237,60 @@ class MapManager(private val context: Context) {
         mapView.invalidate()
     }
 
-    // NEW: Add favorite to map
+    fun clearFavoriteMarkers(mapView: MapView) {
+        try {
+            android.util.Log.d("MapManager", "=== CLEARING FAVORITE MARKERS ===")
+            android.util.Log.d("MapManager", "favoriteMarkers.size: ${favoriteMarkers.size}")
+            android.util.Log.d("MapManager", "mapView.overlays.size before: ${mapView.overlays.size}")
+
+            // Log all current overlays
+            mapView.overlays.forEachIndexed { index, overlay ->
+                if (overlay is Marker) {
+                    android.util.Log.d("MapManager", "Overlay $index: Marker with title '${overlay.title}'")
+                }
+            }
+
+            // Create a copy of the list to avoid concurrent modification
+            val markersToRemove = favoriteMarkers.toList()
+
+            // Remove each favorite marker
+            var removedCount = 0
+            for ((index, marker) in markersToRemove.withIndex()) {
+                try {
+                    val wasInOverlays = mapView.overlays.contains(marker)
+                    val wasRemoved = mapView.overlays.remove(marker)
+                    android.util.Log.d("MapManager", "Marker $index (${marker.title}): inOverlays=$wasInOverlays, removed=$wasRemoved")
+                    if (wasRemoved) removedCount++
+                } catch (e: Exception) {
+                    android.util.Log.e("MapManager", "Error removing marker $index: ${e.message}")
+                }
+            }
+
+            // Clear the favoriteMarkers list
+            favoriteMarkers.clear()
+
+            android.util.Log.d("MapManager", "Removed $removedCount markers from overlays")
+            android.util.Log.d("MapManager", "favoriteMarkers.size after clear: ${favoriteMarkers.size}")
+            android.util.Log.d("MapManager", "mapView.overlays.size after: ${mapView.overlays.size}")
+
+            // Force map refresh
+            mapView.invalidate()
+
+            // Double-check: Log remaining overlays
+            android.util.Log.d("MapManager", "Remaining overlays after clear:")
+            mapView.overlays.forEachIndexed { index, overlay ->
+                if (overlay is Marker) {
+                    android.util.Log.d("MapManager", "  Remaining overlay $index: Marker '${overlay.title}'")
+                }
+            }
+
+            android.util.Log.d("MapManager", "=== CLEAR FAVORITE MARKERS COMPLETED ===")
+
+        } catch (e: Exception) {
+            android.util.Log.e("MapManager", "Error in clearFavoriteMarkers: ${e.message}")
+        }
+    }
+    // Also enhance the addFavoriteToMap method:
     fun addFavoriteToMap(mapView: MapView, favorite: FavoritePlace, listener: Any) {
         try {
             if (mapView.repository == null) {
@@ -246,6 +299,8 @@ class MapManager(private val context: Context) {
                 }, 500)
                 return
             }
+
+            android.util.Log.d("MapManager", "Adding favorite marker for: ${favorite.name}")
 
             val marker = Marker(mapView).apply {
                 position = favorite.location
@@ -273,31 +328,17 @@ class MapManager(private val context: Context) {
             mapView.overlays.add(marker)
             favoriteMarkers.add(marker)
             mapView.invalidate()
+
+            android.util.Log.d("MapManager", "Added favorite marker, total markers: ${favoriteMarkers.size}")
         } catch (e: Exception) {
+            android.util.Log.e("MapManager", "Error adding favorite marker: ${e.message}")
             Handler(Looper.getMainLooper()).postDelayed({
                 try {
                     addFavoriteToMap(mapView, favorite, listener)
                 } catch (retryE: Exception) {
-                    // Give up if retry also fails
+                    android.util.Log.e("MapManager", "Retry failed: ${retryE.message}")
                 }
             }, 1000)
-        }
-    }
-
-    // NEW: Clear all favorite markers
-    fun clearFavoriteMarkers(mapView: MapView) {
-        try {
-            for (marker in favoriteMarkers) {
-                try {
-                    mapView.overlays.remove(marker)
-                } catch (e: Exception) {
-                    // Ignore removal errors
-                }
-            }
-            favoriteMarkers.clear()
-            mapView.invalidate()
-        } catch (e: Exception) {
-            // Log error but continue
         }
     }
 

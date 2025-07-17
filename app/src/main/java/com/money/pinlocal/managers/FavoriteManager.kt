@@ -1,4 +1,3 @@
-// File: managers/FavoriteManager.kt
 package com.money.pinlocal.managers
 
 import com.money.pinlocal.BackendClient
@@ -26,7 +25,7 @@ class FavoriteManager(
 
     private var favoriteListener: FavoriteListener? = null
 
-    fun setFavoriteListener(listener: FavoriteListener) {
+    fun setFavoriteListener(listener: FavoriteListener?) {
         this.favoriteListener = listener
     }
 
@@ -68,56 +67,76 @@ class FavoriteManager(
 
         favoritePlaces.add(favorite)
         saveFavoritesToPreferences()
-
-        // Subscribe to alerts for this location
         subscribeToFavoriteAlerts(favorite)
-
         favoriteListener?.onFavoritesUpdated(favoritePlaces.toList())
         return favorite
     }
 
-    // Update an existing favorite
-    fun updateFavorite(
-        favoriteId: String,
-        name: String? = null,
-        alertDistance: Double? = null,
-        enableSafety: Boolean? = null,
-        enableFun: Boolean? = null,
-        enableLost: Boolean? = null
-    ): Boolean {
-        val index = favoritePlaces.indexOfFirst { it.id == favoriteId }
-        if (index == -1) return false
-
-        val currentFavorite = favoritePlaces[index]
-        val updatedFavorite = currentFavorite.copy(
-            name = name ?: currentFavorite.name,
-            alertDistance = alertDistance ?: currentFavorite.alertDistance,
-            enableSafetyAlerts = enableSafety ?: currentFavorite.enableSafetyAlerts,
-            enableFunAlerts = enableFun ?: currentFavorite.enableFunAlerts,
-            enableLostAlerts = enableLost ?: currentFavorite.enableLostAlerts
-        )
-
-        favoritePlaces[index] = updatedFavorite
+    fun addFavorite(favoritePlace: FavoritePlace) {
+        favoritePlaces.add(favoritePlace)
         saveFavoritesToPreferences()
-
-        // Re-subscribe with new settings
-        subscribeToFavoriteAlerts(updatedFavorite)
-
+        subscribeToFavoriteAlerts(favoritePlace)
         favoriteListener?.onFavoritesUpdated(favoritePlaces.toList())
-        return true
     }
 
-    // Remove a favorite place
+    // CRITICAL: Remove a favorite place with enhanced logging
     fun removeFavorite(favoriteId: String): Boolean {
-        val favorite = favoritePlaces.find { it.id == favoriteId } ?: return false
+        android.util.Log.d("FavoriteManager", "=== REMOVING FAVORITE ===")
+        android.util.Log.d("FavoriteManager", "Favorite ID to remove: $favoriteId")
+        android.util.Log.d("FavoriteManager", "Current favorites count: ${favoritePlaces.size}")
 
-        favoritePlaces.removeAll { it.id == favoriteId }
+        val favorite = favoritePlaces.find { it.id == favoriteId }
+        if (favorite == null) {
+            android.util.Log.e("FavoriteManager", "Favorite not found with ID: $favoriteId")
+            return false
+        }
+
+        android.util.Log.d("FavoriteManager", "Removing favorite: ${favorite.name}")
+
+        // Remove from favorites list
+        val removed = favoritePlaces.removeAll { it.id == favoriteId }
+
+        // Remove associated alerts
         favoriteAlerts.removeAll { it.favoritePlace.id == favoriteId }
 
-        saveFavoritesToPreferences()
-        favoriteListener?.onFavoritesUpdated(favoritePlaces.toList())
+        // Remove from viewed alerts
+        viewedFavoriteAlertIds.removeAll { alertId ->
+            alertId.endsWith(favoriteId)
+        }
 
-        return true
+        if (removed) {
+            // Save to preferences immediately
+            saveFavoritesToPreferences()
+            saveViewedFavoriteAlerts()
+
+            android.util.Log.d("FavoriteManager", "Successfully removed favorite: ${favorite.name}")
+            android.util.Log.d("FavoriteManager", "Remaining favorites count: ${favoritePlaces.size}")
+
+            // Notify listeners AFTER removal is complete
+            favoriteListener?.onFavoritesUpdated(favoritePlaces.toList())
+
+            android.util.Log.d("FavoriteManager", "Notified listeners of favorites update")
+        }
+
+        return removed
+    }
+
+    // Subscribe to backend for background notifications
+    private fun subscribeToFavoriteAlerts(favorite: FavoritePlace) {
+        backendClient.subscribeToAlerts(
+            latitude = favorite.location.latitude,
+            longitude = favorite.location.longitude
+        ) { success, message ->
+            android.util.Log.d("FavoriteManager", "Subscribed to alerts for ${favorite.name}: $success")
+        }
+    }
+
+    // Subscribe all favorites on app startup
+    fun subscribeToAllFavorites() {
+        for (favorite in favoritePlaces) {
+            subscribeToFavoriteAlerts(favorite)
+        }
+        android.util.Log.d("FavoriteManager", "Subscribed to all ${favoritePlaces.size} favorites")
     }
 
     // Get all favorite places
@@ -125,6 +144,25 @@ class FavoriteManager(
 
     // Get favorite by ID
     fun getFavoriteById(id: String): FavoritePlace? = favoritePlaces.find { it.id == id }
+
+    // Create favorite from location
+    fun createFavoriteFromLocation(
+        location: GeoPoint,
+        name: String,
+        description: String,
+        categories: Set<com.money.pinlocal.data.ReportCategory>,
+        alertDistance: Double
+    ): FavoritePlace {
+        return FavoritePlace(
+            name = name,
+            description = description,
+            location = location,
+            alertDistance = alertDistance,
+            enableSafetyAlerts = categories.contains(com.money.pinlocal.data.ReportCategory.SAFETY),
+            enableFunAlerts = categories.contains(com.money.pinlocal.data.ReportCategory.FUN),
+            enableLostAlerts = categories.contains(com.money.pinlocal.data.ReportCategory.LOST_MISSING)
+        )
+    }
 
     // Check for new alerts near favorite places
     fun checkForFavoriteAlerts() {
@@ -176,35 +214,12 @@ class FavoriteManager(
         favoriteListener?.onFavoriteAlertsUpdated(favoriteAlerts.toList(), hasUnviewed)
     }
 
-    fun addFavorite(favoritePlace: FavoritePlace) {
-        favoritePlaces.add(favoritePlace)
-        saveFavoritesToPreferences()
-        subscribeToFavoriteAlerts(favoritePlace)
-        favoriteListener?.onFavoritesUpdated(favoritePlaces.toList())
-    }
-
-    fun createFavoriteFromLocation(
-        location: org.osmdroid.util.GeoPoint,
-        name: String,
-        description: String,
-        categories: Set<com.money.pinlocal.data.ReportCategory>,
-        alertDistance: Double
-    ): FavoritePlace {
-        return FavoritePlace(
-            name = name,
-            description = description,
-            location = location,
-            alertDistance = alertDistance,
-            enableSafetyAlerts = categories.contains(com.money.pinlocal.data.ReportCategory.SAFETY),
-            enableFunAlerts = categories.contains(com.money.pinlocal.data.ReportCategory.FUN),
-            enableLostAlerts = categories.contains(com.money.pinlocal.data.ReportCategory.LOST_MISSING)
-        )
-    }
-
+    // Get favorite alerts
     fun getFavoriteAlerts(favoriteId: String): List<FavoriteAlert> {
         return favoriteAlerts.filter { it.favoritePlace.id == favoriteId }
     }
 
+    // Mark favorite alerts as viewed
     fun markFavoriteAlertsAsViewed(favoriteId: String) {
         for (alert in favoriteAlerts) {
             if (alert.favoritePlace.id == favoriteId) {
@@ -219,6 +234,7 @@ class FavoriteManager(
         favoriteListener?.onFavoriteAlertsUpdated(favoriteAlerts.toList(), hasUnviewed)
     }
 
+    // Update an existing favorite
     fun updateFavorite(updatedFavorite: FavoritePlace) {
         val index = favoritePlaces.indexOfFirst { it.id == updatedFavorite.id }
         if (index != -1) {
@@ -226,33 +242,6 @@ class FavoriteManager(
             saveFavoritesToPreferences()
             favoriteListener?.onFavoritesUpdated(favoritePlaces.toList())
         }
-    }
-    // Get unviewed favorite alerts
-    fun getUnviewedFavoriteAlerts(): List<FavoriteAlert> {
-        return favoriteAlerts.filter {
-            !viewedFavoriteAlertIds.contains(it.report.id + it.favoritePlace.id)
-        }.sortedBy { it.distanceFromFavorite }
-    }
-
-    // Mark favorite alert as viewed
-    fun markFavoriteAlertAsViewed(reportId: String, favoriteId: String) {
-        val alertKey = reportId + favoriteId
-        viewedFavoriteAlertIds.add(alertKey)
-        saveViewedFavoriteAlerts()
-
-        val hasUnviewed = favoriteAlerts.any {
-            !viewedFavoriteAlertIds.contains(it.report.id + it.favoritePlace.id)
-        }
-        favoriteListener?.onFavoriteAlertsUpdated(favoriteAlerts.toList(), hasUnviewed)
-    }
-
-    // Mark all favorite alerts as viewed
-    fun markAllFavoriteAlertsAsViewed() {
-        for (alert in favoriteAlerts) {
-            viewedFavoriteAlertIds.add(alert.report.id + alert.favoritePlace.id)
-        }
-        saveViewedFavoriteAlerts()
-        favoriteListener?.onFavoriteAlertsUpdated(favoriteAlerts.toList(), false)
     }
 
     // Remove alerts for expired reports
@@ -264,23 +253,6 @@ class FavoriteManager(
             !viewedFavoriteAlertIds.contains(it.report.id + it.favoritePlace.id)
         }
         favoriteListener?.onFavoriteAlertsUpdated(favoriteAlerts.toList(), hasUnviewed)
-    }
-
-    // Subscribe to alerts for a favorite location
-    private fun subscribeToFavoriteAlerts(favorite: FavoritePlace) {
-        backendClient.subscribeToAlerts(
-            latitude = favorite.location.latitude,
-            longitude = favorite.location.longitude
-        ) { success, message ->
-            // Silent subscription - we don't need to show status for favorite subscriptions
-        }
-    }
-
-    // Subscribe to all favorites
-    fun subscribeToAllFavorites() {
-        for (favorite in favoritePlaces) {
-            subscribeToFavoriteAlerts(favorite)
-        }
     }
 
     // Get alert summary message
@@ -325,9 +297,12 @@ class FavoriteManager(
 
                     val parts = line.split(":::")
                     if (parts.size >= 8) {
+                        val description = if (parts.size > 9) parts[9] else ""
+
                         val favorite = FavoritePlace(
                             id = parts[0],
                             name = parts[1],
+                            description = description,
                             location = GeoPoint(
                                 parts[2].toDoubleOrNull() ?: 0.0,
                                 parts[3].toDoubleOrNull() ?: 0.0
@@ -353,7 +328,7 @@ class FavoriteManager(
 
     private fun convertFavoritesToJson(favorites: List<FavoritePlace>): String {
         return favorites.joinToString("|||") { favorite ->
-            "${favorite.id}:::${favorite.name}:::${favorite.location.latitude}:::${favorite.location.longitude}:::${favorite.alertDistance}:::${favorite.enableSafetyAlerts}:::${favorite.enableFunAlerts}:::${favorite.enableLostAlerts}:::${favorite.createdAt}"
+            "${favorite.id}:::${favorite.name}:::${favorite.location.latitude}:::${favorite.location.longitude}:::${favorite.alertDistance}:::${favorite.enableSafetyAlerts}:::${favorite.enableFunAlerts}:::${favorite.enableLostAlerts}:::${favorite.createdAt}:::${favorite.description}"
         }
     }
 }
