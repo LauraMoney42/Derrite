@@ -460,9 +460,7 @@ class MainActivity : AppCompatActivity(),
             .setTitle(if (isSpanish) "¿Qué deseas hacer?" else "What would you like to do?")
             .setItems(options) { _, which ->
                 when (which) {
-                    0 -> dialogManager.showReportConfirmDialog(location) { confirmedLocation: GeoPoint ->
-                        showReportInputDialog(confirmedLocation)
-                    }
+                    0 -> showReportInputDialog(location)
                     1 -> dialogManager.showAddFavoriteDialog(location, favoriteManager)
                     2 -> { /* Cancel - do nothing */ }
                 }

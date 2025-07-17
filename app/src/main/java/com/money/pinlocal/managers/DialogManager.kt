@@ -61,106 +61,169 @@ class DialogManager(
         onSubmit: (GeoPoint, String, Bitmap?, ReportCategory) -> Unit
     ) {
         val isSpanish = preferencesManager.getSavedLanguage() == "es"
+        var currentCategory = selectedCategory
 
-        // Create dialog layout programmatically
+        // Main container with iOS-style background
         val dialogLayout = LinearLayout(context).apply {
             orientation = LinearLayout.VERTICAL
-            setPadding(48, 48, 48, 48)
-            setBackgroundColor(Color.BLACK)
+            setPadding(0, 0, 0, 0)
+            setBackgroundColor(android.graphics.Color.TRANSPARENT)
+        }
+
+        // Content card with rounded corners
+        val contentCard = LinearLayout(context).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(24, 24, 24, 24)
+            setBackgroundColor(ContextCompat.getColor(context, R.color.surface))
+            background = ContextCompat.getDrawable(context, R.drawable.ios_card_background)
         }
 
         // Title
         val titleText = TextView(context).apply {
             text = if (isSpanish) "Crear Reporte" else "Create Report"
-            textSize = 20f
-            setTextColor(Color.WHITE)
+            textSize = 22f
+            setTextColor(ContextCompat.getColor(context, R.color.text_primary))
             gravity = android.view.Gravity.CENTER
-            setPadding(0, 0, 0, 24)
+            setPadding(0, 0, 0, 32)
             setTypeface(null, android.graphics.Typeface.BOLD)
         }
-        dialogLayout.addView(titleText)
+        contentCard.addView(titleText)
 
-        // Category display
-        val categoryDisplay = TextView(context).apply {
-            updateCategoryDisplay(this, selectedCategory, isSpanish)
-            textSize = 16f
-            gravity = android.view.Gravity.CENTER
+        // Category section
+        val categoryCard = LinearLayout(context).apply {
+            orientation = LinearLayout.VERTICAL
             setPadding(16, 16, 16, 16)
-            setBackgroundColor(Color.parseColor("#333333"))
+            setBackgroundColor(ContextCompat.getColor(context, R.color.surface_variant))
+            background = ContextCompat.getDrawable(context, R.drawable.ios_input_background)
             layoutParams = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
                 LinearLayout.LayoutParams.WRAP_CONTENT
             ).apply {
-                setMargins(0, 0, 0, 16)
+                setMargins(0, 0, 0, 20)
             }
         }
-        dialogLayout.addView(categoryDisplay)
 
-        // Text input
-        val editReportText = TextInputEditText(context).apply {
+        val categoryLabel = TextView(context).apply {
+            text = if (isSpanish) "Categoría" else "Category"
+            textSize = 20f  // ← CHANGED FROM 14f TO 16f
+            setTextColor(ContextCompat.getColor(context, R.color.text_secondary))
+            setTypeface(null, android.graphics.Typeface.BOLD)
+            setPadding(0, 0, 0, 8)
+        }
+        categoryCard.addView(categoryLabel)
+
+        val categorySpinner = android.widget.Spinner(context).apply {
+            setPadding(0, 12, 0, 12)
+            setBackgroundColor(android.graphics.Color.TRANSPARENT)
+            setPopupBackgroundResource(R.drawable.ios_input_background)
+        }
+
+        val categories = ReportCategory.values()
+        val categoryNames = categories.map { "${it.getIcon()} ${it.getDisplayName(isSpanish)}" }
+        val adapter = object : android.widget.ArrayAdapter<String>(context, android.R.layout.simple_spinner_item, categoryNames) {
+            override fun getView(position: Int, convertView: android.view.View?, parent: android.view.ViewGroup): android.view.View {
+                val view = super.getView(position, convertView, parent)
+                val textView = view as TextView
+                textView.textSize = 20f
+                textView.setTextColor(ContextCompat.getColor(context, R.color.text_primary))
+                textView.setCompoundDrawablesWithIntrinsicBounds(0, 0, R.drawable.ic_dropdown_arrow, 0)
+                textView.compoundDrawablePadding = 8
+                return view
+            }
+
+            override fun getDropDownView(position: Int, convertView: android.view.View?, parent: android.view.ViewGroup): android.view.View {
+                val view = super.getDropDownView(position, convertView, parent)
+                val textView = view as TextView
+                textView.textSize = 18f
+                textView.setTextColor(ContextCompat.getColor(context, R.color.text_primary))
+                textView.setPadding(16, 16, 16, 16)
+                return view
+            }
+        }
+        adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
+        categorySpinner.adapter = adapter
+        categorySpinner.setSelection(categories.indexOf(currentCategory))
+
+// ADD THESE MISSING LINES:
+        categorySpinner.onItemSelectedListener = object : android.widget.AdapterView.OnItemSelectedListener {
+            override fun onItemSelected(parent: android.widget.AdapterView<*>?, view: android.view.View?, position: Int, id: Long) {
+                currentCategory = categories[position]
+                onCategoryChange(currentCategory)
+            }
+            override fun onNothingSelected(parent: android.widget.AdapterView<*>?) {}
+        }
+
+        categoryCard.addView(categorySpinner)  // ← THIS WAS MISSING!
+        contentCard.addView(categoryCard)
+
+        // Description section
+        val descCard = LinearLayout(context).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(16, 16, 16, 16)
+            setBackgroundColor(ContextCompat.getColor(context, R.color.surface_variant))
+            background = ContextCompat.getDrawable(context, R.drawable.ios_input_background)
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            ).apply {
+                setMargins(0, 0, 0, 20)
+            }
+        }
+
+        val descLabel = TextView(context).apply {
+            text = if (isSpanish) "Descripción" else "Description"
+            textSize = 18f
+            setTextColor(ContextCompat.getColor(context, R.color.text_secondary))
+            setTypeface(null, android.graphics.Typeface.BOLD)
+            setPadding(0, 0, 0, 8)
+        }
+        descCard.addView(descLabel)
+
+        val editReportText = com.google.android.material.textfield.TextInputEditText(context).apply {
             hint = if (isSpanish) "Describe la situación..." else "Describe the situation..."
-            setTextColor(Color.WHITE)
-            setHintTextColor(Color.parseColor("#888888"))
-            setBackgroundColor(Color.parseColor("#333333"))
-            setPadding(16, 16, 16, 16)
+            setTextColor(ContextCompat.getColor(context, R.color.text_primary))
+            setHintTextColor(ContextCompat.getColor(context, R.color.text_tertiary))
+            setBackgroundColor(android.graphics.Color.TRANSPARENT)
+            setPadding(0, 8, 0, 8)
+            minLines = 3
+            maxLines = 5
+        }
+        descCard.addView(editReportText)
+        contentCard.addView(descCard)
+
+        // Add Photo button (modern iOS style)
+        val btnAddPhoto = Button(context).apply {
+            text = if (isSpanish) "  Agregar Foto" else "  Add Photo"
+            setTextColor(ContextCompat.getColor(context, R.color.text_secondary))
+            setBackgroundColor(ContextCompat.getColor(context, R.color.surface_variant))
+            background = ContextCompat.getDrawable(context, R.drawable.ios_button_secondary)
+            setPadding(20, 16, 20, 16)
+            setCompoundDrawablesWithIntrinsicBounds(R.drawable.ic_camera_modern, 0, 0, 0)
+            compoundDrawablePadding = 8
+            textSize = 16f
+            setTypeface(null, android.graphics.Typeface.BOLD)
             layoutParams = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
                 LinearLayout.LayoutParams.WRAP_CONTENT
             ).apply {
-                setMargins(0, 0, 0, 16)
+                setMargins(0, 0, 0, 32)
             }
         }
-        dialogLayout.addView(editReportText)
+        contentCard.addView(btnAddPhoto)
 
         // Buttons layout
         val buttonLayout = LinearLayout(context).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = android.view.Gravity.CENTER
-            setPadding(0, 16, 0, 0)
-        }
-
-        val btnSelectCategory = Button(context).apply {
-            text = if (isSpanish) "Cambiar Categoría" else "Change Category"
-            setTextColor(Color.WHITE)
-            setBackgroundColor(Color.parseColor("#2196F3"))
-            setPadding(16, 12, 16, 12)
-            layoutParams = LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.WRAP_CONTENT,
-                LinearLayout.LayoutParams.WRAP_CONTENT
-            ).apply {
-                setMargins(0, 0, 8, 0)
-            }
-        }
-
-        val btnAddPhoto = Button(context).apply {
-            text = if (isSpanish) "Agregar Foto" else "Add Photo"
-            setTextColor(Color.WHITE)
-            setBackgroundColor(Color.parseColor("#4CAF50"))
-            setPadding(16, 12, 16, 12)
-            layoutParams = LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.WRAP_CONTENT,
-                LinearLayout.LayoutParams.WRAP_CONTENT
-            ).apply {
-                setMargins(8, 0, 0, 0)
-            }
-        }
-
-        buttonLayout.addView(btnSelectCategory)
-        buttonLayout.addView(btnAddPhoto)
-        dialogLayout.addView(buttonLayout)
-
-        // Submit/Cancel buttons
-        val submitLayout = LinearLayout(context).apply {
-            orientation = LinearLayout.HORIZONTAL
-            gravity = android.view.Gravity.CENTER
-            setPadding(0, 24, 0, 0)
         }
 
         val btnCancel = Button(context).apply {
-            text = if (isSpanish) "CANCELAR" else "CANCEL"
-            setTextColor(Color.parseColor("#888888"))
-            setBackgroundColor(Color.TRANSPARENT)
+            text = if (isSpanish) "Cancelar" else "Cancel"
+            setTextColor(ContextCompat.getColor(context, R.color.text_secondary))
+            setBackgroundColor(android.graphics.Color.TRANSPARENT)
+            background = ContextCompat.getDrawable(context, R.drawable.ios_button_text)
             setPadding(32, 16, 32, 16)
+            textSize = 16f
             layoutParams = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.WRAP_CONTENT,
                 LinearLayout.LayoutParams.WRAP_CONTENT
@@ -170,48 +233,45 @@ class DialogManager(
         }
 
         val btnSubmit = Button(context).apply {
-            text = if (isSpanish) "ENVIAR REPORTE" else "SUBMIT REPORT"
-            setTextColor(Color.WHITE)
-            setBackgroundColor(Color.parseColor("#FF0000"))
+            text = if (isSpanish) "Enviar" else "Submit"  // ← SHORTENED TEXT
+            setTextColor(ContextCompat.getColor(context, R.color.white))
+            background = ContextCompat.getDrawable(context, R.drawable.ios_button_success)  // ← ROUNDED GREEN
             setPadding(32, 16, 32, 16)
+            textSize = 16f
+            setTypeface(null, android.graphics.Typeface.BOLD)
             layoutParams = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.WRAP_CONTENT,
                 LinearLayout.LayoutParams.WRAP_CONTENT
             )
         }
 
-        submitLayout.addView(btnCancel)
-        submitLayout.addView(btnSubmit)
-        dialogLayout.addView(submitLayout)
+        buttonLayout.addView(btnCancel)
+        buttonLayout.addView(btnSubmit)
+        contentCard.addView(buttonLayout)
+        dialogLayout.addView(contentCard)
 
         val dialog = AlertDialog.Builder(context)
             .setView(dialogLayout)
             .setCancelable(true)
             .create()
 
-        btnSelectCategory.setOnClickListener {
-            showCategorySelectionDialog { category ->
-                onCategoryChange(category)
-                dialog.dismiss()
-                // Recreate dialog with new category
-                showReportInputDialog(location, category, onCategoryChange, onPhotoRequest, onSubmit)
-            }
-        }
+// Set rounded background
+        dialog.window?.setBackgroundDrawableResource(R.drawable.ios_dialog_background)
 
         btnAddPhoto.setOnClickListener { onPhotoRequest() }
         btnCancel.setOnClickListener { dialog.dismiss() }
         btnSubmit.setOnClickListener {
             val reportText = editReportText.text?.toString()?.trim()
             if (reportText.isNullOrEmpty()) {
+                editReportText.error = if (isSpanish) "Ingresa una descripción" else "Enter a description"
                 return@setOnClickListener
             }
-            onSubmit(location, reportText, null, selectedCategory)
+            onSubmit(location, reportText, null, currentCategory)
             dialog.dismiss()
         }
 
         dialog.show()
     }
-
 
     // NEW: Show Favorite Options Dialog (Missing method that was causing the error)
     fun showFavoriteOptionsDialog(
@@ -663,7 +723,7 @@ class DialogManager(
 
         val titleText = TextView(context).apply {
             text = if (isSpanish) "Selecciona Categoría" else "Select Category"
-            textSize = 20f
+            textSize = 22f
             setTextColor(Color.WHITE)
             gravity = android.view.Gravity.CENTER
             setPadding(0, 0, 0, 32)
@@ -703,7 +763,7 @@ class DialogManager(
 
             val titleText = TextView(context).apply {
                 text = category.getDisplayName(isSpanish)
-                textSize = 18f
+                textSize = 20f
                 setTextColor(Color.WHITE)
                 setTypeface(null, android.graphics.Typeface.BOLD)
             }
@@ -711,7 +771,7 @@ class DialogManager(
 
             val descText = TextView(context).apply {
                 text = getCategoryDescription(category, isSpanish)
-                textSize = 14f
+                textSize = 20f
                 setTextColor(Color.parseColor("#DDDDDD"))
                 setPadding(0, 4, 0, 0)
             }
@@ -758,67 +818,130 @@ class DialogManager(
     ) {
         val isSpanish = preferencesManager.getSavedLanguage() == "es"
 
+        // Main container with iOS-style background
         val dialogLayout = LinearLayout(context).apply {
             orientation = LinearLayout.VERTICAL
-            setPadding(48, 48, 48, 48)
-            setBackgroundColor(Color.BLACK)
+            setPadding(0, 0, 0, 0)
+            setBackgroundColor(android.graphics.Color.TRANSPARENT)
         }
 
-        val titleText = TextView(context).apply {
-            text = "${report.category.getIcon()} ${report.category.getDisplayName(isSpanish)}"
+        // Content card with rounded corners
+        val contentCard = LinearLayout(context).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(24, 24, 24, 24)
+            setBackgroundColor(ContextCompat.getColor(context, R.color.surface))
+            background = ContextCompat.getDrawable(context, R.drawable.ios_card_background)
+        }
+
+        // Category header with icon
+        val categoryHeader = LinearLayout(context).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = android.view.Gravity.CENTER
+            setPadding(16, 16, 16, 24)
+            setBackgroundColor(ContextCompat.getColor(context, R.color.surface_variant))
+            background = ContextCompat.getDrawable(context, R.drawable.ios_input_background)
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            ).apply {
+                setMargins(0, 0, 0, 20)
+            }
+        }
+
+        val categoryIcon = TextView(context).apply {
+            text = report.category.getIcon()
+            textSize = 28f
+            setPadding(0, 0, 12, 0)
+        }
+
+        val categoryTitle = TextView(context).apply {
+            text = report.category.getDisplayName(isSpanish)
             textSize = 20f
             setTextColor(ContextCompat.getColor(context, report.category.getColorResId()))
-            gravity = android.view.Gravity.CENTER
-            setPadding(0, 0, 0, 32)
             setTypeface(null, android.graphics.Typeface.BOLD)
         }
-        dialogLayout.addView(titleText)
+
+        categoryHeader.addView(categoryIcon)
+        categoryHeader.addView(categoryTitle)
+        contentCard.addView(categoryHeader)
+
+        // Report content section
+        val contentSection = LinearLayout(context).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(16, 16, 16, 16)
+            setBackgroundColor(ContextCompat.getColor(context, R.color.surface_variant))
+            background = ContextCompat.getDrawable(context, R.drawable.ios_input_background)
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            ).apply {
+                setMargins(0, 0, 0, 20)
+            }
+        }
+
+        val contentLabel = TextView(context).apply {
+            text = if (isSpanish) "Contenido" else "Content"
+            textSize = 16f
+            setTextColor(ContextCompat.getColor(context, R.color.text_secondary))
+            setTypeface(null, android.graphics.Typeface.BOLD)
+            setPadding(0, 0, 0, 8)
+        }
 
         val textReportContent = TextView(context).apply {
             text = report.originalText
             textSize = 16f
-            setTextColor(Color.WHITE)
-            setPadding(16, 16, 16, 32)
-            setBackgroundColor(Color.parseColor("#333333"))
-
-            layoutParams = LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT,
-                LinearLayout.LayoutParams.WRAP_CONTENT
-            ).apply {
-                setMargins(0, 0, 0, 16)
-            }
+            setTextColor(ContextCompat.getColor(context, R.color.text_primary))
+            setPadding(0, 8, 0, 8)
+            setLineSpacing(0f, 1.4f)  // ← CORRECT METHOD (extraSpace, multiplier)
         }
-        dialogLayout.addView(textReportContent)
 
+        contentSection.addView(contentLabel)
+        contentSection.addView(textReportContent)
+        contentCard.addView(contentSection)
+
+        // Translate button (iOS-style)
         val btnTranslate = Button(context).apply {
-            text = if (isSpanish) "TRADUCIR" else "TRANSLATE"
+            text = if (isSpanish) "Traducir" else "Translate"
+            setTextColor(ContextCompat.getColor(context, R.color.white))
+            background = ContextCompat.getDrawable(context, R.drawable.ios_button_success)
+            setPadding(20, 16, 20, 16)
             textSize = 16f
-            setBackgroundColor(Color.parseColor("#2196F3"))
-            setTextColor(Color.WHITE)
-            setPadding(32, 24, 32, 24)
-
+            setTypeface(null, android.graphics.Typeface.BOLD)
             layoutParams = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
                 LinearLayout.LayoutParams.WRAP_CONTENT
             ).apply {
-                setMargins(0, 0, 0, 32)
+                setMargins(0, 0, 0, 20)
             }
         }
-        dialogLayout.addView(btnTranslate)
+        contentCard.addView(btnTranslate)
 
-        val timeText = TextView(context).apply {
-            text = "Reported: ${getTimeAgo(report.timestamp)}"
+        // Time info
+        val timeSection = TextView(context).apply {
+            text = "📍 ${if (isSpanish) "Reportado" else "Reported"}: ${getTimeAgo(report.timestamp)}"
             textSize = 14f
-            setTextColor(Color.WHITE)
-            setPadding(0, 0, 0, 32)
+            setTextColor(ContextCompat.getColor(context, R.color.text_secondary))
+            setPadding(16, 12, 16, 24)
+            setBackgroundColor(ContextCompat.getColor(context, R.color.surface_variant))
+            background = ContextCompat.getDrawable(context, R.drawable.ios_input_background)
+            gravity = android.view.Gravity.CENTER
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            ).apply {
+                setMargins(0, 0, 0, 24)
+            }
         }
-        dialogLayout.addView(timeText)
+        contentCard.addView(timeSection)
 
+        // Close button
         val btnClose = Button(context).apply {
-            text = if (isSpanish) "CERRAR" else "CLOSE"
-            setTextColor(Color.RED)
-            setBackgroundColor(Color.TRANSPARENT)
-
+            text = if (isSpanish) "Cerrar" else "Close"
+            setTextColor(ContextCompat.getColor(context, R.color.text_secondary))
+            setBackgroundColor(android.graphics.Color.TRANSPARENT)
+            background = ContextCompat.getDrawable(context, R.drawable.ios_button_text)
+            setPadding(32, 16, 32, 16)
+            textSize = 16f
             layoutParams = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.WRAP_CONTENT,
                 LinearLayout.LayoutParams.WRAP_CONTENT
@@ -826,7 +949,17 @@ class DialogManager(
                 gravity = android.view.Gravity.CENTER_HORIZONTAL
             }
         }
-        dialogLayout.addView(btnClose)
+        contentCard.addView(btnClose)
+
+        dialogLayout.addView(contentCard)
+
+        val dialog = AlertDialog.Builder(context)
+            .setView(dialogLayout)
+            .setCancelable(true)
+            .create()
+
+        // Set rounded background
+        dialog.window?.setBackgroundDrawableResource(R.drawable.ios_dialog_background)
 
         var isTranslated = false
 
@@ -842,34 +975,29 @@ class DialogManager(
                     toLang = targetLang,
                     onSuccess = { translatedText ->
                         textReportContent.text = translatedText
-                        btnTranslate.text = if (isSpanish) "MOSTRAR ORIGINAL" else "SHOW ORIGINAL"
-                        btnTranslate.setBackgroundColor(Color.parseColor("#4CAF50"))
+                        btnTranslate.text = if (isSpanish) "Mostrar Original" else "Show Original"
+                        btnTranslate.background = ContextCompat.getDrawable(context, R.drawable.ios_button_success)
                         btnTranslate.isEnabled = true
                         isTranslated = true
                     },
                     onError = { error ->
-                        btnTranslate.text = if (isSpanish) "Error de Traducción" else "Translation Failed"
-                        btnTranslate.setBackgroundColor(Color.RED)
+                        btnTranslate.text = if (isSpanish) "Error" else "Translation Failed"
+                        btnTranslate.background = ContextCompat.getDrawable(context, R.drawable.ios_button_success)
                         btnTranslate.isEnabled = true
 
                         Handler(Looper.getMainLooper()).postDelayed({
-                            btnTranslate.text = if (isSpanish) "TRADUCIR" else "TRANSLATE"
-                            btnTranslate.setBackgroundColor(Color.parseColor("#2196F3"))
+                            btnTranslate.text = if (isSpanish) "Traducir" else "Translate"
+                            btnTranslate.background = ContextCompat.getDrawable(context, R.drawable.ios_button_success)
                         }, 2000)
                     }
                 )
             } else {
                 textReportContent.text = report.originalText
-                btnTranslate.text = if (isSpanish) "TRADUCIR" else "TRANSLATE"
-                btnTranslate.setBackgroundColor(Color.parseColor("#2196F3"))
+                btnTranslate.text = if (isSpanish) "Traducir" else "Translate"
+                btnTranslate.background = ContextCompat.getDrawable(context, R.drawable.ios_button_success)
                 isTranslated = false
             }
         }
-
-        val dialog = AlertDialog.Builder(context)
-            .setView(dialogLayout)
-            .setCancelable(true)
-            .create()
 
         btnClose.setOnClickListener {
             dialog.dismiss()
