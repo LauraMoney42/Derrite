@@ -1,6 +1,7 @@
 // File: managers/MapManager.kt (Updated with Favorites)
 package com.money.pinlocal.managers
 
+import com.money.pinlocal.data.ReportCategory
 import android.animation.ObjectAnimator
 import android.content.Context
 import android.graphics.Color
@@ -44,6 +45,14 @@ class MapManager(private val context: Context) {
     // NEW: Interface for favorite marker interactions
     interface FavoriteMapInteractionListener {
         fun onFavoriteMarkerClick(favorite: FavoritePlace)
+    }
+
+    private fun getReportPinDrawable(category: ReportCategory): Int {
+        return when (category) {
+            ReportCategory.SAFETY -> R.drawable.ic_report_marker        // Red
+            ReportCategory.FUN -> R.drawable.ic_fun_marker              // Yellow
+            ReportCategory.LOST_MISSING -> R.drawable.ic_lost_marker    // Blue
+        }
     }
 
     fun setupMap(mapView: MapView, packageName: String) {
@@ -216,7 +225,7 @@ class MapManager(private val context: Context) {
         val marker = Marker(mapView).apply {
             position = report.location
             setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_BOTTOM)
-            icon = ContextCompat.getDrawable(context, R.drawable.ic_report_marker)
+            icon = ContextCompat.getDrawable(context, getReportPinDrawable(report.category))
             title = "${report.category.getIcon()} ${report.category.getDisplayName(false)}"
 
             setOnMarkerClickListener { _, _ ->
@@ -290,7 +299,7 @@ class MapManager(private val context: Context) {
             android.util.Log.e("MapManager", "Error in clearFavoriteMarkers: ${e.message}")
         }
     }
-    // Also enhance the addFavoriteToMap method:
+
     fun addFavoriteToMap(mapView: MapView, favorite: FavoritePlace, listener: Any) {
         try {
             if (mapView.repository == null) {

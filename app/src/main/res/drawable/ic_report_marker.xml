@@ -4,9 +4,9 @@
     android:viewportWidth="24"
     android:viewportHeight="24">
 
-    <!-- Report marker background -->
+    <!-- Red safety pin background -->
     <path
-        android:fillColor="#FF5722"
+        android:fillColor="#FF3B30"
         android:pathData="M12,2C8.13,2 5,5.13 5,9c0,5.25 7,13 7,13s7,-7.75 7,-13C19,5.13 15.87,2 12,2z"/>
 
     <!-- Warning triangle inside -->
@@ -21,7 +21,7 @@
 
     <!-- Subtle shadow for depth -->
     <path
-        android:fillColor="#D84315"
+        android:fillColor="#D70015"
         android:fillAlpha="0.4"
         android:pathData="M12,21.5c0,0 6.5,-7.25 6.5,-12.5c0,-0.34 -0.02,-0.67 -0.07,-1C17.45,12.48 12,20.5 12,20.5z"/>
 

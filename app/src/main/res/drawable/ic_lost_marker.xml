@@ -4,20 +4,20 @@
     android:viewportWidth="24"
     android:viewportHeight="24">
 
-    <!-- Green location pin background -->
+    <!-- Blue lost item pin background -->
     <path
-        android:fillColor="#34C759"
+        android:fillColor="#007AFF"
         android:pathData="M12,2C8.13,2 5,5.13 5,9c0,5.25 7,13 7,13s7,-7.75 7,-13C19,5.13 15.87,2 12,2z"/>
 
-    <!-- Inner white circle -->
+    <!-- Search/magnifying glass icon inside -->
     <path
         android:fillColor="#FFFFFF"
-        android:pathData="M12,7c-1.1,0 -2,0.9 -2,2s0.9,2 2,2s2,-0.9 2,-2S13.1,7 12,7z"/>
+        android:pathData="M15.5,14h-0.79l-0.28,-0.27C15.41,12.59 16,11.11 16,9.5 16,6.91 13.09,5 10.5,5S5,6.91 5,9.5 6.91,14 9.5,14c1.61,0 3.09,-0.59 4.23,-1.57l0.27,0.28v0.79l5,4.99L20.49,19l-4.99,-5zM9.5,12C8.01,12 7,10.99 7,9.5S8.01,7 9.5,7 12,8.01 12,9.5 10.99,12 9.5,12z"/>
 
     <!-- Subtle shadow for depth -->
     <path
-        android:fillColor="#28A745"
-        android:fillAlpha="0.3"
+        android:fillColor="#0056CC"
+        android:fillAlpha="0.4"
         android:pathData="M12,21.5c0,0 6.5,-7.25 6.5,-12.5c0,-0.34 -0.02,-0.67 -0.07,-1C17.45,12.48 12,20.5 12,20.5z"/>
 
 </vector>
