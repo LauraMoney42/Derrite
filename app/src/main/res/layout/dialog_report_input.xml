@@ -9,7 +9,7 @@
     <TextView
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="Create Report"
+        android:text="Create Pin"
         android:textColor="@color/white"
         android:textSize="18sp"
         android:textStyle="bold"
@@ -79,7 +79,7 @@
             android:id="@+id/btn_submit"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="Submit Report"
+            android:text="Submit Pin"
             android:backgroundTint="@color/primary" />
 
     </LinearLayout>

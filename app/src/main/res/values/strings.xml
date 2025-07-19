@@ -18,9 +18,9 @@
 
     <string name="translate_button">Translate</string>
     <string name="show_original">Show original text</string>
-    <string name="report_sent_spanish">Report sent in Spanish</string>
-    <string name="report_sent_english">Report sent in English</string>
-    <string name="report_sent">Report sent</string>
+    <string name="report_sent_spanish">Pin sent in Spanish</string>
+    <string name="report_sent_english">Pin sent in English</string>
+    <string name="report_sent">Pin sent</string>
     <string name="now">Now</string>
 
     <!-- Search -->
@@ -34,18 +34,18 @@
     <string name="search_result">Search Result</string>
     <string name="please_enter_address">Please enter an address</string>
 
-    <!-- Reports -->
-    <string name="safety_report">Report</string>
-    <string name="report_created">Report created anonymously</string>
-    <string name="confirm_report_title">Report Issue?</string>
-    <string name="confirm_report_message">Report anonymous alert at this location?</string>
-    <string name="yes_report">Yes, Report</string>
+    <!-- Reports (content changed to pins) -->
+    <string name="safety_report">Pin</string>
+    <string name="report_created">Pin created anonymously</string>
+    <string name="confirm_report_title">Create Pin?</string>
+    <string name="confirm_report_message">Create anonymous pin at this location?</string>
+    <string name="yes_report">Yes, Create Pin</string>
     <string name="cancel">Cancel</string>
-    <string name="create_report_title">Create Report</string>
+    <string name="create_report_title">Create Pin</string>
     <string name="report_description_hint">Describe the concern...</string>
     <string name="submit">Submit</string>
     <string name="please_enter_description">Please enter a description</string>
-    <string name="reported_time">Reported %1$s</string>
+    <string name="reported_time">Pinned %1$s</string>
     <string name="close">Close</string>
 
     <!-- Photo -->
@@ -62,13 +62,13 @@
     <string name="hours_ago">%1$d hr ago</string>
     <string name="days_ago">%1$d day ago</string>
 
-    <string name="report_input_title">Report Details</string>
+    <string name="report_input_title">Pin Details</string>
     <string name="version">Version</string>
     <string name="notifications">Notifications</string>
-    <string name="nearby_reports">Nearby Reports</string>
-    <string name="about_description">PinLocal helps communities stay informed through anonymous reporting</string>
+    <string name="nearby_reports">Nearby Pins</string>
+    <string name="about_description">PinLocal helps communities stay informed through anonymous pinning</string>
     <string name="privacy">Privacy</string>
-    <string name="privacy_description">Your privacy is protected with anonymous reporting</string>
+    <string name="privacy_description">Your privacy is protected with anonymous pinning</string>
 
     <string name="back_button">Back</string>
 
@@ -81,7 +81,7 @@
     <string name="checking_your_area">Checking your area…</string>
     <string name="checking_for_alerts">Checking for alerts…</string>
     <string name="no_alerts_in_area">All Clear!</string>
-    <string name="no_alerts_description">No reports in your area right now.</string>
+    <string name="no_alerts_description">No pins in your area right now.</string>
     <string name="new_alerts_found">%1$d new alerts in your area</string>
     <string name="new_alerts_available">New alerts in your area</string>
     <string name="location_needed_for_alerts">Location needed to check for alerts</string>
@@ -114,10 +114,11 @@
     <string name="device_capability_low">Entry-level device with basic translation</string>
 
     <!-- Instructions -->
-    <string name="instruction_title">Anonymous Reporting</string>
+    <string name="instruction_title">Anonymous Pinning</string>
     <string name="instruction_description">Long press anywhere on the map to create a pin</string>
     <string name="user_guide_link">View User Guide</string>
-    <!-- NEW: Favorites Strings -->
+
+    <!-- Favorites Strings -->
     <string name="favorites">Favorites</string>
     <string name="favorite_places">Favorite Places</string>
     <string name="add_favorite">Add Favorite</string>
@@ -147,6 +148,6 @@
     <string name="no_favorite_alerts">No alerts at your favorite places</string>
     <string name="recent_alerts_count">%1$d alerts in the last 24 hours</string>
     <string name="what_would_you_like_to_do">What would you like to do?</string>
-    <string name="create_report">Create Report</string>
+    <string name="create_report">Create Pin</string>
     <string name="add_to_favorites">Add to Favorites</string>
 </resources>

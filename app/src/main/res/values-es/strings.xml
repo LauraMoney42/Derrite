@@ -31,23 +31,23 @@
 
     <string name="translate_button">Traducir</string>
     <string name="show_original">Mostrar texto original</string>
-    <string name="report_sent_spanish">Reporte enviado en español</string>
-    <string name="report_sent_english">Reporte enviado en inglés</string>
-    <string name="report_sent">Reporte enviado</string>
+    <string name="report_sent_spanish">Pin enviado en español</string>
+    <string name="report_sent_english">Pin enviado en inglés</string>
+    <string name="report_sent">Pin enviado</string>
     <string name="now">Ahora</string>
 
-    <!-- Reports -->
-    <string name="safety_report">Reporte</string>
-    <string name="report_created">Reporte creado anónimamente</string>
-    <string name="confirm_report_title">¿Reportar Problema?</string>
-    <string name="confirm_report_message">¿Reportar alerta anónima en esta ubicación?</string>
-    <string name="yes_report">Sí, Reportar</string>
+    <!-- Reports (content changed to pins) -->
+    <string name="safety_report">Pin</string>
+    <string name="report_created">Pin creado anónimamente</string>
+    <string name="confirm_report_title">¿Crear Pin?</string>
+    <string name="confirm_report_message">¿Crear pin anónimo en esta ubicación?</string>
+    <string name="yes_report">Sí, Crear Pin</string>
     <string name="cancel">Cancelar</string>
-    <string name="create_report_title">Crear Reporte</string>
+    <string name="create_report_title">Crear Pin</string>
     <string name="report_description_hint">Describe el problema...</string>
     <string name="submit">Enviar</string>
     <string name="please_enter_description">Por favor ingresa una descripción</string>
-    <string name="reported_time">Reportado %1$s</string>
+    <string name="reported_time">Pin creado %1$s</string>
     <string name="close">Cerrar</string>
 
     <!-- Photo -->
@@ -64,13 +64,13 @@
     <string name="hours_ago">Hace %1$d hr</string>
     <string name="days_ago">Hace %1$d día</string>
 
-    <string name="report_input_title">Detalles del Reporte</string>
+    <string name="report_input_title">Detalles del Pin</string>
     <string name="version">Versión</string>
     <string name="notifications">Notificaciones</string>
-    <string name="nearby_reports">Reportes Cercanos</string>
-    <string name="about_description">PinLocal ayuda a las comunidades a mantenerse informadas a través de reportes anónimos</string>
+    <string name="nearby_reports">Pines Cercanos</string>
+    <string name="about_description">PinLocal ayuda a las comunidades a mantenerse informadas a través de pines anónimos</string>
     <string name="privacy">Privacidad</string>
-    <string name="privacy_description">Tu privacidad está protegida con reportes anónimos</string>
+    <string name="privacy_description">Tu privacidad está protegida con pines anónimos</string>
 
     <string name="back_button">Atrás</string>
 
@@ -83,7 +83,7 @@
     <string name="checking_your_area">Verificando tu área…</string>
     <string name="checking_for_alerts">Buscando alertas…</string>
     <string name="no_alerts_in_area">¡Todo Despejado!</string>
-    <string name="no_alerts_description">No hay reportes en tu área ahora mismo.</string>
+    <string name="no_alerts_description">No hay pines en tu área ahora mismo.</string>
     <string name="new_alerts_found">%1$d nuevas alertas en tu área</string>
     <string name="new_alerts_available">Nuevas alertas en tu área</string>
     <string name="location_needed_for_alerts">Se necesita ubicación para verificar alertas</string>
@@ -113,10 +113,11 @@
     <string name="device_capability_low">Dispositivo básico con traducción simple</string>
 
     <!-- Instructions -->
-    <string name="instruction_title">Reportes Anónimos</string>
+    <string name="instruction_title">Pines Anónimos</string>
     <string name="instruction_description">Mantén presionado en cualquier lugar del mapa para crear un pin</string>
     <string name="user_guide_link">Ver Guía del Usuario</string>
-    <!-- NUEVOS: Strings de Favoritos -->
+
+    <!-- Strings de Favoritos -->
     <string name="favorites">Favoritos</string>
     <string name="favorite_places">Lugares Favoritos</string>
     <string name="add_favorite">Agregar Favorito</string>
@@ -146,6 +147,6 @@
     <string name="no_favorite_alerts">No hay alertas en tus lugares favoritos</string>
     <string name="recent_alerts_count">%1$d alertas en las últimas 24 horas</string>
     <string name="what_would_you_like_to_do">¿Qué te gustaría hacer?</string>
-    <string name="create_report">Crear Reporte</string>
+    <string name="create_report">Crear Pin</string>
     <string name="add_to_favorites">Agregar a Favoritos</string>
 </resources>
