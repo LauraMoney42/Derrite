@@ -14,6 +14,8 @@ import com.money.pinlocal.managers.FavoriteManager
 import com.money.pinlocal.managers.PreferencesManager
 import com.money.pinlocal.managers.ReportManager
 import com.money.pinlocal.managers.LocationManager
+import androidx.appcompat.app.AlertDialog
+import com.money.pinlocal.managers.DialogManager
 
 class FavoritesActivity : AppCompatActivity(), FavoriteManager.FavoriteListener {
 
@@ -139,30 +141,32 @@ class FavoritesActivity : AppCompatActivity(), FavoriteManager.FavoriteListener 
 
         val emptyDescription = TextView(this).apply {
             text = if (isSpanish)
-                "Agrega lugares importantes para recibir alertas cuando algo suceda cerca."
+                "Agrega lugares importantes para recibir alertas cuando algo suceda cerca. Para privacidad, puedes usar apodos para lugares personales como tu casa o trabajo."
             else
-                "Add important places to get alerts when something happens nearby."
+                "Add important places to get alerts when something happens nearby. For privacy, you can use nicknames for personal locations like your home or work."
             textSize = 15f
             setTextColor(Color.parseColor("#8E8E93"))
             gravity = android.view.Gravity.CENTER
             setLineSpacing(4f, 1f)
-            setPadding(0, 0, 0, 32)
+            setPadding(0, 0, 0, 16) // Reduced bottom padding
         }
         emptyStateContainer.addView(emptyDescription)
 
-        val emptyButton = Button(this).apply {
-            text = if (isSpanish) "Agregar primer favorito" else "Add First Favorite"
-            setTextColor(Color.WHITE)
-            setBackgroundColor(Color.parseColor("#0066CC"))
+        val faqLink = TextView(this).apply {
+            text = if (isSpanish) "Ver FAQ para más detalles" else "See FAQ for more details"
             textSize = 15f
-            setPadding(32, 16, 32, 16)
+            setTextColor(Color.parseColor("#0066CC")) // Apple blue
+            gravity = android.view.Gravity.CENTER
+            setPadding(0, 0, 0, 32)
+            isClickable = true
+            isFocusable = true
             setOnClickListener {
-                // Return to main activity to add favorite
-                setResult(RESULT_OK)
-                finish()
+                // Show FAQ dialog
+                val dialogManager = com.money.pinlocal.managers.DialogManager(this@FavoritesActivity, preferencesManager)
+                dialogManager.showUserGuideDialog()
             }
         }
-        emptyStateContainer.addView(emptyButton)
+        emptyStateContainer.addView(faqLink)
 
         contentContainer.addView(emptyStateContainer)
 
@@ -175,6 +179,7 @@ class FavoritesActivity : AppCompatActivity(), FavoriteManager.FavoriteListener 
         mainLayout.addView(contentContainer)
         setContentView(mainLayout)
     }
+
 
     private fun loadFavorites() {
         favoriteManager.loadSavedData()
@@ -311,10 +316,20 @@ class FavoritesActivity : AppCompatActivity(), FavoriteManager.FavoriteListener 
     private fun showDeleteConfirmation(favorite: FavoritePlace) {
         val isSpanish = preferencesManager.getSavedLanguage() == "es"
 
-        android.app.AlertDialog.Builder(this)
+        val dialog = androidx.appcompat.app.AlertDialog.Builder(this)
             .setTitle(if (isSpanish) "Eliminar favorito" else "Delete Favorite")
             .setMessage(if (isSpanish) "¿Eliminar '${favorite.name}'?" else "Delete '${favorite.name}'?")
-            .setPositiveButton(if (isSpanish) "Eliminar" else "Delete") { _, _ ->
+            .setPositiveButton(if (isSpanish) "Eliminar" else "Delete", null)
+            .setNegativeButton(if (isSpanish) "Cancelar" else "Cancel", null)
+            .create()
+
+        dialog.show()
+
+        // Style the buttons after showing
+        dialog.getButton(androidx.appcompat.app.AlertDialog.BUTTON_POSITIVE)?.apply {
+            setTextColor(Color.parseColor("#FF3B30")) // Red color for delete
+            textSize = 16f
+            setOnClickListener {
                 android.util.Log.d("FavoritesActivity", "Deleting favorite: ${favorite.name}")
 
                 val success = favoriteManager.removeFavorite(favorite.id)
@@ -322,11 +337,16 @@ class FavoritesActivity : AppCompatActivity(), FavoriteManager.FavoriteListener 
 
                 if (success) {
                     setResult(RESULT_OK)
-                    loadFavorites() // Refresh the list
+                    loadFavorites()
                 }
+                dialog.dismiss()
             }
-            .setNegativeButton(if (isSpanish) "Cancelar" else "Cancel", null)
-            .show()
+        }
+
+        dialog.getButton(androidx.appcompat.app.AlertDialog.BUTTON_NEGATIVE)?.apply {
+            setTextColor(Color.parseColor("#0066CC")) // Blue color for cancel
+            textSize = 16f
+        }
     }
 
     override fun onDestroy() {

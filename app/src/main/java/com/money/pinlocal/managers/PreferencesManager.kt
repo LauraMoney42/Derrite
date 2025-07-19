@@ -20,6 +20,7 @@ class PreferencesManager(private val context: Context) {
         private const val KEY_FAVORITES = "favorites"
         private const val KEY_FAVORITE_ALERTS = "favorite_alerts"
         private const val KEY_VIEWED_FAVORITE_ALERTS = "viewed_favorite_alerts"
+        private const val KEY_ALARM_OVERRIDE_SILENT = "alarm_override_silent"
 
         // Alert distance constants
         const val ALERT_DISTANCE_1_MILE = 1609.0
@@ -51,7 +52,13 @@ class PreferencesManager(private val context: Context) {
 
         context.resources.updateConfiguration(config, context.resources.displayMetrics)
     }
+    fun getAlarmOverrideSilent(): Boolean {
+        return preferences.getBoolean(KEY_ALARM_OVERRIDE_SILENT, false)
+    }
 
+    fun saveAlarmOverrideSilent(override: Boolean) {
+        preferences.edit().putBoolean(KEY_ALARM_OVERRIDE_SILENT, override).apply()
+    }
     // Alert distance preferences
     fun getSavedAlertDistance(): Double {
         return preferences.getFloat(KEY_ALERT_DISTANCE, ALERT_DISTANCE_ZIP_CODE.toFloat()).toDouble()

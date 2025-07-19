@@ -1422,21 +1422,21 @@ class DialogManager(
         dialog.show()
     }
 
-    private fun showUserGuideDialog() {
+     fun showUserGuideDialog() {
         showInfoDialog(
             if (preferencesManager.getSavedLanguage() == "es") "Guía del Usuario" else "User Guide",
             getUserGuideContent()
         )
     }
 
-    private fun showPrivacyPolicyDialog() {
+     fun showPrivacyPolicyDialog() {
         showInfoDialog(
             if (preferencesManager.getSavedLanguage() == "es") "Política de Privacidad" else "Privacy Policy",
             getPrivacyPolicyContent()
         )
     }
 
-    private fun showAboutDialog() {
+     fun showAboutDialog() {
         showInfoDialog(
             if (preferencesManager.getSavedLanguage() == "es") "Acerca de" else "About",
             getAboutContent()

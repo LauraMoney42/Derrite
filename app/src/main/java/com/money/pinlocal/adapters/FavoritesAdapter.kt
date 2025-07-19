@@ -16,6 +16,7 @@ class FavoritesAdapter(
     private val onFavoriteClick: (FavoritePlace) -> Unit,
     private val onViewOnMapClick: (FavoritePlace) -> Unit,
     private val onViewAlertsClick: (FavoritePlace) -> Unit,
+    private val onDeleteClick: (FavoritePlace) -> Unit,
     private val preferencesManager: PreferencesManager
 ) : RecyclerView.Adapter<FavoritesAdapter.FavoriteViewHolder>() {
 
@@ -43,7 +44,8 @@ class FavoritesAdapter(
         private val textAlertSettings: TextView = itemView.findViewById(R.id.text_alert_settings)
         private val textRecentAlerts: TextView = itemView.findViewById(R.id.text_recent_alerts)
         private val newAlertsBadge: View = itemView.findViewById(R.id.new_alerts_badge)
-        private val btnFavoriteOptions: ImageButton = itemView.findViewById(R.id.btn_favorite_options)
+        private val btnFavoriteOptions: ImageButton =
+            itemView.findViewById(R.id.btn_favorite_options)
         private val btnViewAlerts: Button = itemView.findViewById(R.id.btn_view_alerts)
         private val btnViewOnMap: Button = itemView.findViewById(R.id.btn_view_on_map)
 
@@ -58,9 +60,9 @@ class FavoritesAdapter(
             val categories = favorite.getEnabledCategoriesText(isSpanish)
             textAlertSettings.text = "$categories • $distance"
 
-            // Set up click listeners
+            // Set up options menu click - ADD THIS
             btnFavoriteOptions.setOnClickListener {
-                onFavoriteClick(favorite)
+                showOptionsMenu(favorite, isSpanish)
             }
 
             btnViewAlerts.setOnClickListener {
@@ -80,10 +82,39 @@ class FavoritesAdapter(
                 btnViewOnMap.text = "View on Map"
             }
 
-            // TODO: Update with actual alert counts when available
-            // For now, hide recent alerts and badge
             textRecentAlerts.visibility = View.GONE
             newAlertsBadge.visibility = View.GONE
+        }
+
+        private fun showOptionsMenu(favorite: FavoritePlace, isSpanish: Boolean) {
+            val context = itemView.context
+            val options = if (isSpanish) {
+                arrayOf("Ver en Mapa", "Eliminar")
+            } else {
+                arrayOf("View on Map", "Delete")
+            }
+
+            android.app.AlertDialog.Builder(context)
+                .setTitle(favorite.name)
+                .setItems(options) { _, which ->
+                    when (which) {
+                        0 -> onViewOnMapClick(favorite)
+                        1 -> showDeleteConfirmation(favorite, isSpanish)
+                    }
+                }
+                .show()
+        }
+
+        private fun showDeleteConfirmation(favorite: FavoritePlace, isSpanish: Boolean) {
+            val context = itemView.context
+            android.app.AlertDialog.Builder(context)
+                .setTitle(if (isSpanish) "Eliminar Favorito" else "Delete Favorite")
+                .setMessage(if (isSpanish) "¿Eliminar '${favorite.name}'?" else "Delete '${favorite.name}'?")
+                .setPositiveButton(if (isSpanish) "Eliminar" else "Delete") { _, _ ->
+                    onDeleteClick(favorite)
+                }
+                .setNegativeButton(if (isSpanish) "Cancelar" else "Cancel", null)
+                .show()
         }
     }
 }
