@@ -705,22 +705,29 @@ class MainActivity : AppCompatActivity(),
 
     private fun autoLocateOnStartup() {
         val isLanguageChange = preferencesManager.isLanguageChange()
-        if (isLanguageChange) {
-            preferencesManager.setLanguageChange(false)
-            if (locationManager.hasLocationPermission()) {
-                getCurrentLocationSilently(isStartup = true)
-            }
-        } else {
-            if (locationManager.hasLocationPermission()) {
+
+        if (locationManager.hasLocationPermission()) {
+            // Permission already granted - get location immediately
+            if (!isLanguageChange) {
                 val message = if (preferencesManager.getSavedLanguage() == "es")
                     "Encontrando tu ubicación..." else "Finding your location..."
                 showStatusCard(message, isLoading = true)
-                getCurrentLocationSilently(isStartup = true)
-            } else {
-                hideStatusCard()
             }
+            getCurrentLocationSilently(isStartup = true)
+        } else {
+            // No permission - auto-request it
+            val message = if (preferencesManager.getSavedLanguage() == "es")
+                "Solicitando permiso de ubicación..." else "Requesting location permission..."
+            showStatusCard(message, isLoading = true)
+            requestLocationPermission()
         }
 
+        // Clear language change flag if it was set
+        if (isLanguageChange) {
+            preferencesManager.setLanguageChange(false)
+        }
+
+        // Schedule alert checking after location is obtained
         Handler(Looper.getMainLooper()).postDelayed({
             locationManager.getCurrentLocation()?.let { location ->
                 alertManager.checkForNewAlerts(location)
@@ -785,10 +792,7 @@ class MainActivity : AppCompatActivity(),
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
             ActivityCompat.requestPermissions(
                 this,
-                arrayOf(
-                    Manifest.permission.ACCESS_FINE_LOCATION,
-                    Manifest.permission.ACCESS_COARSE_LOCATION
-                ),
+                arrayOf(Manifest.permission.ACCESS_COARSE_LOCATION), // Only coarse location
                 LOCATION_PERMISSION_REQUEST
             )
         } else {
@@ -868,7 +872,11 @@ class MainActivity : AppCompatActivity(),
         when (requestCode) {
             LOCATION_PERMISSION_REQUEST -> {
                 if (grantResults.isNotEmpty() && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
-                    getCurrentLocation()
+                    // Permission granted - immediately get location
+                    val message = if (preferencesManager.getSavedLanguage() == "es")
+                        "Encontrando tu ubicación..." else "Finding your location..."
+                    showStatusCard(message, isLoading = true)
+                    getCurrentLocationSilently(isStartup = true)
                 } else {
                     val message = if (preferencesManager.getSavedLanguage() == "es")
                         "Se requiere permiso de ubicación" else "Location permission required"
@@ -876,7 +884,6 @@ class MainActivity : AppCompatActivity(),
                 }
             }
         }
-
         photoManager.handlePermissionResult(requestCode, grantResults)
     }
 
