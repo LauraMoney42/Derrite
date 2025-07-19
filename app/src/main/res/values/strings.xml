@@ -115,8 +115,8 @@
 
     <!-- Instructions -->
     <string name="instruction_title">Anonymous Reporting</string>
-    <string name="instruction_description">Long press anywhere on the map to create an anonymous report or add a favorite place</string>
-
+    <string name="instruction_description">Long press anywhere on the map to create a pin</string>
+    <string name="user_guide_link">View User Guide</string>
     <!-- NEW: Favorites Strings -->
     <string name="favorites">Favorites</string>
     <string name="favorite_places">Favorite Places</string>

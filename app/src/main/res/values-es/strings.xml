@@ -114,8 +114,8 @@
 
     <!-- Instructions -->
     <string name="instruction_title">Reportes Anónimos</string>
-    <string name="instruction_description">Mantén presionado en cualquier lugar del mapa para crear un reporte anónimo o agregar un lugar favorito</string>
-
+    <string name="instruction_description">Mantén presionado en cualquier lugar del mapa para crear un pin</string>
+    <string name="user_guide_link">Ver Guía del Usuario</string>
     <!-- NUEVOS: Strings de Favoritos -->
     <string name="favorites">Favoritos</string>
     <string name="favorite_places">Lugares Favoritos</string>

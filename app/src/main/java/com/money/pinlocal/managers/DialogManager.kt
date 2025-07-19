@@ -1645,64 +1645,81 @@ class DialogManager(
     private fun getUserGuideContent(): String {
         val isSpanish = preferencesManager.getSavedLanguage() == "es"
         return if (isSpanish) {
-            "Cómo Usar PinLocal\n\n" +
-                    "REPORTAR\n" +
-                    "• Presiona y mantén presionado en cualquier lugar del mapa para crear un reporte\n" +
-                    "• Selecciona una categoría: Seguridad (rojo), Diversión (amarillo), o Perdido/Desaparecido (azul)\n" +
-                    "• Agrega una descripción de la situación\n\n" +
+            "PIN A LOCATION\n" +
+                    "• Presiona y mantén presionado en cualquier lugar del mapa para crear un pin\n" +
+                    "• Selecciona una categoría: Seguridad (rojo), Diversión (morado), o Perdido/Desaparecido (azul)\n" +
+                    "• Agrega una descripción de la situación\n" +
+                    "• Opcional: Agrega una foto anónima\n\n" +
                     "FAVORITOS\n" +
                     "• Presiona y mantén presionado en el mapa y selecciona 'Agregar a Favoritos'\n" +
                     "• Nombra el lugar y configura las alertas\n" +
                     "• Recibe notificaciones cuando algo pase cerca\n\n" +
                     "ALERTAS\n" +
-                    "• Recibe notificaciones cuando se hagan reportes dentro de tu distancia elegida\n" +
-                    "• Personaliza la distancia de alerta en Configuración\n\n" +
+                    "• Recibe notificaciones cuando se hagan pines dentro de tu distancia elegida\n" +
+                    "• Personaliza la distancia de alerta en Configuración\n" +
+                    "• Activa 'Anular modo silencio' en Configuración para que las alertas de seguridad suenen incluso cuando tu teléfono esté en silencio\n\n" +
                     "PRIVACIDAD\n" +
-                    "• No se requieren cuentas - completamente anónimo\n" +
-                    "• Todos los datos expiran automáticamente después de 8 horas"
+                    "• Completamente anónimo - no se requieren nombres de usuario\n" +
+                    "• No se guardan direcciones IP, IDs de dispositivo, o información personal\n" +
+                    "• Tus nombres de lugares favoritos se guardan solo en tu teléfono, no en nuestros servidores\n" +
+                    "• Para máxima privacidad, usa nombres genéricos como 'Lugar 1' en lugar de 'Casa' o 'Escuela'\n" +
+                    "• Todos los pines se eliminan automáticamente después de 8 horas"
         } else {
-            "How to Use PinLocal\n\n" +
-                    "REPORTING\n" +
-                    "• Long press anywhere on the map to create a report\n" +
-                    "• Select a category: Safety (red), Fun (yellow), or Lost/Missing (blue)\n" +
-                    "• Add a description of the situation\n\n" +
+            "PIN A LOCATION\n" +
+                    "• Long press anywhere on the map to create a pin\n" +
+                    "• Select a category: Safety (red), Fun (purple), or Lost/Missing (blue)\n" +
+                    "• Add a description of the situation\n" +
+                    "• Optional: Add an anonymous photo\n\n" +
                     "FAVORITES\n" +
                     "• Long press on the map and select 'Add to Favorites'\n" +
                     "• Name the place and configure alerts\n" +
                     "• Get notified when something happens nearby\n\n" +
                     "ALERTS\n" +
-                    "• Get notified when reports are made within your chosen distance\n" +
-                    "• Customize alert distance in Settings\n\n" +
+                    "• Get notified when pins are made within your chosen distance\n" +
+                    "• Customize alert distance in Settings\n" +
+                    "• Turn on 'Alarm overrides silent mode' in Settings to make safety alerts sound even when your phone is on silent\n\n" +
                     "PRIVACY\n" +
-                    "• No accounts required - completely anonymous\n" +
-                    "• All data expires automatically after 8 hours"
+                    "• Completely anonymous - no usernames required\n" +
+                    "• No IP addresses, device IDs, or personal information is stored\n" +
+                    "• Your favorite place names are saved only on your phone, not on our servers\n" +
+                    "• For maximum privacy, use generic names like 'Place 1' instead of 'Home' or 'School'\n" +
+                    "• All pins automatically delete after 8 hours"
         }
     }
-
     private fun getPrivacyPolicyContent(): String {
         val isSpanish = preferencesManager.getSavedLanguage() == "es"
         return if (isSpanish) {
-            "Política de Privacidad\n\n" +
-                    "ANÓNIMO POR DISEÑO\n" +
+            "ANÓNIMO POR DISEÑO\n" +
                     "• No se requieren cuentas de usuario o registro\n" +
-                    "• No se recopila ni almacena información personal\n\n" +
+                    "• No se recopilan direcciones IP, IDs de dispositivo, o información personal\n" +
+                    "• Completamente anónimo sin identificadores únicos\n\n" +
                     "PRIVACIDAD DE UBICACIÓN\n" +
-                    "• Las coordenadas GPS exactas nunca se almacenan\n" +
-                    "• Solo se usan zonas anónimas de 500m\n\n" +
+                    "• Las coordenadas GPS nunca se almacenan en nuestros servidores\n" +
+                    "• Solo se usan zonas anónimas de 500m para procesamiento\n" +
+                    "• Los nombres de lugares favoritos se guardan solo en tu teléfono\n\n" +
                     "ALMACENAMIENTO DE DATOS\n" +
-                    "• Todos los reportes se auto-eliminan después de 8 horas\n" +
-                    "• No hay almacenamiento permanente de datos de usuario"
+                    "• Todos los pines se auto-eliminan después de 8 horas\n" +
+                    "• No hay almacenamiento permanente de datos de usuario\n" +
+                    "• Los favoritos no se almacenan en nuestros servidores\n\n" +
+                    "RECOMENDACIONES DE PRIVACIDAD\n" +
+                    "• Usa nombres genéricos como 'Lugar 1' en lugar de 'Casa' o 'Escuela'\n" +
+                    "• Evita incluir información personal en las descripciones de pines"
         } else {
-            "Privacy Policy\n\n" +
-                    "ANONYMOUS BY DESIGN\n" +
+            "ANONYMOUS BY DESIGN\n" +
                     "• No user accounts or registration required\n" +
-                    "• No personal information collected or stored\n\n" +
+                    "• No IP addresses, device IDs, or personal information collected\n" +
+                    "• Completely anonymous with no unique identifiers\n\n" +
                     "LOCATION PRIVACY\n" +
-                    "• Exact GPS coordinates never stored\n" +
-                    "• Only anonymous 500m zones are used\n\n" +
+                    "• GPS coordinates are never stored on our servers\n" +
+                    "• Only anonymous 500m zones are used for processing\n" +
+                    "• Favorite place names are saved only on your phone\n\n" +
                     "DATA STORAGE\n" +
-                    "• All reports auto-delete after 8 hours\n" +
-                    "• No permanent storage of any user data"
+                    "• All pins auto-delete after 8 hours\n" +
+                    "• No permanent storage of any user data\n" +
+                    "• Favorites are not stored on our servers\n\n" +
+                    "PRIVACY RECOMMENDATIONS\n" +
+                    "• Use generic names like 'Place 1' instead of 'Home' or 'School'\n" +
+                    "• Avoid including personal information in pin descriptions"
         }
     }
 

@@ -218,6 +218,7 @@ class MainActivity : AppCompatActivity(),
         android.util.Log.d("MainActivity", "FavoriteListener set up successfully")
     }
 
+
     // Also update the onFavoritesUpdated method with additional debugging:
     override fun onFavoritesUpdated(favorites: List<FavoritePlace>) {
         android.util.Log.d("MainActivity", "=== onFavoritesUpdated CALLED ===")
@@ -255,27 +256,43 @@ class MainActivity : AppCompatActivity(),
             }
         }
     }
-    // NEW: Setup instruction overlay behavior
+
     private fun setupInstructionOverlay() {
+        val btnUserGuideLink = findViewById<TextView>(R.id.btn_user_guide_link)
+
         // Check if user has created reports before
         val hasCreatedReports = reportManager.getActiveReports().isNotEmpty() ||
                 preferencesManager.hasUserCreatedReports()
 
-        if (hasCreatedReports) {
-            // Hide immediately if user has used the app before
+        // Check if this is a language change
+        val isLanguageChange = preferencesManager.isLanguageChange()
+
+        if (hasCreatedReports && !isLanguageChange) {
+            // Hide immediately if user has used the app before AND it's not a language change
             instructionOverlay.visibility = View.GONE
             hasUserInteracted = true
         } else {
-            // Show instruction overlay for new users
+            // Show instruction overlay for new users OR language changes
             instructionOverlay.visibility = View.VISIBLE
+            hasUserInteracted = false
 
             // Make it clickable to dismiss
             instructionOverlay.setOnClickListener {
                 hideInstructionOverlay()
             }
+
+            // Set up User Guide link
+            btnUserGuideLink.setOnClickListener {
+                hideInstructionOverlay()
+                dialogManager.showUserGuideDialog()
+            }
+
+            // If it was a language change, clear the flag
+            if (isLanguageChange) {
+                preferencesManager.setLanguageChange(false)
+            }
         }
     }
-
     // NEW: Schedule auto-hide of instruction overlay
     private fun scheduleInstructionOverlayAutoHide() {
         if (!hasUserInteracted && instructionOverlay.visibility == View.VISIBLE) {
