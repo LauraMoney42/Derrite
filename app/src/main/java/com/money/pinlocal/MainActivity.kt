@@ -340,16 +340,24 @@ class MainActivity : AppCompatActivity(),
         mapManager.setupMap(mapView, packageName)
         mapManager.setupMapLongPressListener(mapView, this)
 
-        // Load existing reports and favorites on map
         Handler(Looper.getMainLooper()).postDelayed({
-            reportManager.getActiveReports().forEach { report ->
-                mapManager.addReportToMap(mapView, report, this)
-            }
+            try {
+                // ADD SAFETY CHECK
+                if (::mapView.isInitialized && mapView.repository != null) {
+                    reportManager.getActiveReports().forEach { report ->
+                        mapManager.addReportToMap(mapView, report, this)
+                    }
 
-            favoriteManager.getFavorites().forEach { favorite ->
-                mapManager.addFavoriteToMap(mapView, favorite, this)
+                    favoriteManager.getFavorites().forEach { favorite ->
+                        mapManager.addFavoriteToMap(mapView, favorite, this)
+                    }
+                } else {
+                    android.util.Log.w("MainActivity", "MapView not ready, skipping initial load")
+                }
+            } catch (e: Exception) {
+                android.util.Log.e("MainActivity", "Error loading existing items on map: ${e.message}")
             }
-        }, 2000)
+        }, 3000) // Increase delay from 2000 to 3000
     }
 
     private fun setupBottomNavigation() {
@@ -494,11 +502,8 @@ class MainActivity : AppCompatActivity(),
     }
 
     private fun updateFavoritesButtonColor(hasUnviewedAlerts: Boolean) {
-        val tintColor = if (hasUnviewedAlerts) {
-            ContextCompat.getColor(this, android.R.color.holo_red_light)
-        } else {
-            ContextCompat.getColor(this, R.color.bottom_nav_icon)
-        }
+        // Always use the default bottom nav icon color (no red)
+        val tintColor = ContextCompat.getColor(this, R.color.bottom_nav_icon)
         btnFavorites.imageTintList = android.content.res.ColorStateList.valueOf(tintColor)
     }
 
@@ -637,7 +642,7 @@ class MainActivity : AppCompatActivity(),
 
                 val locationText = locationManager.getLocationDescription(location)
                 val message = if (preferencesManager.getSavedLanguage() == "es")
-                    "Estás en: $locationText" else "You are at: $locationText"
+                    "$locationText" else "$locationText"
                 showStatusCard(message, isLoading = false)
                 Handler(Looper.getMainLooper()).postDelayed({ hideStatusCard() }, 5000)
             } else {

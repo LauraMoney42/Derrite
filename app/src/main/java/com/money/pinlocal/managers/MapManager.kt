@@ -1,4 +1,4 @@
-// File: managers/MapManager.kt (Updated with Favorites)
+// File: managers/MapManager.kt (Updated with Favorites - FIXED)
 package com.money.pinlocal.managers
 
 import com.money.pinlocal.data.ReportCategory
@@ -50,8 +50,8 @@ class MapManager(private val context: Context) {
     private fun getReportPinDrawable(category: ReportCategory): Int {
         return when (category) {
             ReportCategory.SAFETY -> R.drawable.ic_report_marker        // Red
-            ReportCategory.FUN -> R.drawable.ic_fun_marker              // Yellow
-            ReportCategory.LOST_MISSING -> R.drawable.ic_lost_marker    // Blue
+            ReportCategory.FUN -> R.drawable.ic_report_marker           // Should use different icon
+            ReportCategory.LOST_MISSING -> R.drawable.ic_report_marker  // Should use different icon
         }
     }
 
@@ -218,32 +218,58 @@ class MapManager(private val context: Context) {
     }
 
     fun addReportToMap(mapView: MapView, report: Report, listener: MapInteractionListener) {
-        val circle = createReportCircle(report.location, report.category)
-        mapView.overlays.add(circle)
-        reportCircles.add(circle)
-
-        val marker = Marker(mapView).apply {
-            position = report.location
-            setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_BOTTOM)
-            icon = ContextCompat.getDrawable(context, getReportPinDrawable(report.category))
-            title = "${report.category.getIcon()} ${report.category.getDisplayName(false)}"
-
-            setOnMarkerClickListener { _, _ ->
-                listener.onReportMarkerClick(report)
-                true
+        try {
+            if (mapView.repository == null) {
+                Handler(Looper.getMainLooper()).postDelayed({
+                    addReportToMap(mapView, report, listener)
+                }, 500)
+                return
             }
 
-            alpha = 0f
-            ObjectAnimator.ofFloat(this, "alpha", 0f, 1f).apply {
-                duration = 500
-                interpolator = DecelerateInterpolator()
-                start()
+            val circle = createReportCircle(report.location, report.category)
+            mapView.overlays.add(circle)
+            reportCircles.add(circle)
+
+            val marker = Marker(mapView).apply {
+                position = report.location
+                setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_BOTTOM)
+
+                // Use the specific drawable for each category
+                val drawableRes = when (report.category) {
+                    ReportCategory.SAFETY -> R.drawable.ic_report_marker
+                    ReportCategory.FUN -> R.drawable.ic_fun_marker
+                    ReportCategory.LOST_MISSING -> R.drawable.ic_lost_marker
+                }
+
+                icon = ContextCompat.getDrawable(context, drawableRes)
+                title = "${report.category.getIcon()} ${report.category.getDisplayName(false)}"
+
+                setOnMarkerClickListener { _, _ ->
+                    listener.onReportMarkerClick(report)
+                    true
+                }
+
+                alpha = 0f
+                ObjectAnimator.ofFloat(this, "alpha", 0f, 1f).apply {
+                    duration = 500
+                    interpolator = DecelerateInterpolator()
+                    start()
+                }
             }
+
+            mapView.overlays.add(marker)
+            reportMarkers.add(marker)
+            mapView.invalidate()
+        } catch (e: Exception) {
+            android.util.Log.e("MapManager", "Error adding report to map: ${e.message}")
+            Handler(Looper.getMainLooper()).postDelayed({
+                try {
+                    addReportToMap(mapView, report, listener)
+                } catch (retryE: Exception) {
+                    android.util.Log.e("MapManager", "Retry failed: ${retryE.message}")
+                }
+            }, 1000)
         }
-
-        mapView.overlays.add(marker)
-        reportMarkers.add(marker)
-        mapView.invalidate()
     }
 
     fun clearFavoriteMarkers(mapView: MapView) {
@@ -300,16 +326,23 @@ class MapManager(private val context: Context) {
         }
     }
 
+    // FIXED: Complete addFavoriteToMap method
     fun addFavoriteToMap(mapView: MapView, favorite: FavoritePlace, listener: Any) {
         try {
+            android.util.Log.d("MapManager", "=== addFavoriteToMap CALLED ===")
+            android.util.Log.d("MapManager", "Favorite: ${favorite.name}")
+            android.util.Log.d("MapManager", "MapView repository null: ${mapView.repository == null}")
+            android.util.Log.d("MapManager", "Listener type: ${listener::class.java.simpleName}")
+
             if (mapView.repository == null) {
+                android.util.Log.w("MapManager", "MapView repository is null, scheduling retry")
                 Handler(Looper.getMainLooper()).postDelayed({
                     addFavoriteToMap(mapView, favorite, listener)
                 }, 500)
                 return
             }
 
-            android.util.Log.d("MapManager", "Adding favorite marker for: ${favorite.name}")
+            android.util.Log.d("MapManager", "Creating favorite marker for: ${favorite.name}")
 
             val marker = Marker(mapView).apply {
                 position = favorite.location
@@ -339,6 +372,7 @@ class MapManager(private val context: Context) {
             mapView.invalidate()
 
             android.util.Log.d("MapManager", "Added favorite marker, total markers: ${favoriteMarkers.size}")
+
         } catch (e: Exception) {
             android.util.Log.e("MapManager", "Error adding favorite marker: ${e.message}")
             Handler(Looper.getMainLooper()).postDelayed({

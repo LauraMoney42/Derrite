@@ -9,7 +9,7 @@
     <color name="background">#F2F2F7</color>               <!-- iOS grouped background -->
     <color name="error">#FF3B30</color>                    <!-- iOS red -->
     <color name="success">#34C759</color>                  <!-- iOS green -->
-    <color name="warning">#FFCC02</color>                  <!-- iOS yellow -->
+    <color name="warning">#871DCE</color>                  <!-- iOS purple -->
 
     <!-- Text Colors (iOS hierarchy) -->
     <color name="text_primary">#000000</color>             <!-- iOS label primary -->
@@ -48,10 +48,10 @@
     <color name="category_safety_fill">#20FF3B30</color>   <!-- Red with transparency -->
     <color name="category_safety_stroke">#80FF3B30</color> <!-- Red stroke -->
 
-    <color name="category_fun">#FFCC02</color>             <!-- iOS Yellow -->
+    <color name="category_fun">#871DCE</color>             <!-- iOS Yellow -->
     <color name="category_fun_light">#FFF8E1</color>       <!-- Light yellow -->
-    <color name="category_fun_fill">#20FFCC02</color>      <!-- Yellow with transparency -->
-    <color name="category_fun_stroke">#80FFCC02</color>    <!-- Yellow stroke -->
+    <color name="category_fun_fill">#20931FE0</color>      <!-- Purple with transparency -->
+    <color name="category_fun_stroke">#871DCE</color>    <!-- Yellow stroke -->
 
     <color name="category_lost">#007AFF</color>            <!-- iOS Blue -->
     <color name="category_lost_light">#E3F2FD</color>      <!-- Light blue -->
