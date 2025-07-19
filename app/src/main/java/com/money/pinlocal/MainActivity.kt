@@ -552,10 +552,16 @@ class MainActivity : AppCompatActivity(),
     }
 
     private fun setupLocationButton() {
+        fabLocation.backgroundTintList = android.content.res.ColorStateList.valueOf(
+            Color.parseColor("#8E8E93") // iOS gray color
+        )
+
+        fabLocation.imageTintList = android.content.res.ColorStateList.valueOf(Color.WHITE)
+
         fabLocation.setOnClickListener {
             animateButtonPress(fabLocation)
             getCurrentLocation()
-            hideInstructionOverlay()  // NEW: Hide on any interaction
+            hideInstructionOverlay()
         }
     }
 
@@ -794,7 +800,7 @@ class MainActivity : AppCompatActivity(),
         val textColor = when {
             isError -> Color.RED
             isLoading -> Color.parseColor("#888888")
-            else -> Color.parseColor("#4CAF50")
+            else -> Color.parseColor("#3C3C43")
         }
         statusText.setTextColor(textColor)
 

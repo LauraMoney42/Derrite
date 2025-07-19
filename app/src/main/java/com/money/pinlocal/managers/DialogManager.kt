@@ -6,7 +6,6 @@ import com.money.pinlocal.BackendClient
 import android.app.AlertDialog
 import android.content.Context
 import android.graphics.Bitmap
-import android.graphics.Color
 import android.location.Location
 import android.os.Handler
 import android.os.Looper
@@ -28,6 +27,7 @@ import com.money.pinlocal.data.FavoritePlace
 import org.osmdroid.util.GeoPoint
 import java.io.IOException
 import java.util.Locale
+import android.graphics.Color
 
 class DialogManager(
     private val context: Context,
@@ -1187,14 +1187,14 @@ class DialogManager(
 
         val items = if (isSpanish) {
             arrayOf(
-                "Preferencias",
+                "Preferencias de Usuario",  // Changed from "Preferencias"
                 "Guía del Usuario",
                 "Política de Privacidad",
                 "Acerca de"
             )
         } else {
             arrayOf(
-                "Preferences",
+                "User Preferences",  // Changed from "Preferences"
                 "User Guide",
                 "Privacy Policy",
                 "About"
@@ -1418,6 +1418,37 @@ class DialogManager(
 
         val alarmSwitch = com.google.android.material.materialswitch.MaterialSwitch(context).apply {
             isChecked = preferencesManager.getAlarmOverrideSilent()
+
+            // Set custom colors for better visibility
+            val enabledColor = ContextCompat.getColor(context, R.color.accent) // Your system blue
+            val disabledColor = ContextCompat.getColor(context, R.color.text_tertiary) // Gray
+
+            // Track colors (background)
+            val trackColors = android.content.res.ColorStateList(
+                arrayOf(
+                    intArrayOf(android.R.attr.state_checked),
+                    intArrayOf(-android.R.attr.state_checked)
+                ),
+                intArrayOf(
+                    enabledColor,
+                    disabledColor
+                )
+            )
+            trackTintList = trackColors
+
+            // Thumb colors (circle)
+            val thumbColors = android.content.res.ColorStateList(
+                arrayOf(
+                    intArrayOf(android.R.attr.state_checked),
+                    intArrayOf(-android.R.attr.state_checked)
+                ),
+                intArrayOf(
+                    Color.WHITE,
+                    Color.WHITE
+                )
+            )
+            thumbTintList = thumbColors
+
             setOnCheckedChangeListener { _, isChecked ->
                 preferencesManager.saveAlarmOverrideSilent(isChecked)
             }
