@@ -1332,6 +1332,7 @@ class DialogManager(
         dialog.show()
     }
 
+    // Complete updated showPreferencesDialog method in DialogManager.kt
     private fun showPreferencesDialog() {
         val isSpanish = preferencesManager.getSavedLanguage() == "es"
 
@@ -1351,14 +1352,108 @@ class DialogManager(
         }
         dialogLayout.addView(titleText)
 
-        val currentAlertDistance = preferencesManager.getAlertDistanceText(preferencesManager.getSavedAlertDistance())
-        val messageText = TextView(context).apply {
-            text = if (isSpanish) {
-                "Distancia de Alerta actual: $currentAlertDistance\n\nToca OK para cambiar"
-            } else {
-                "Current Alert Distance: $currentAlertDistance\n\nTap OK to change"
-            }
+        // Alert Distance Section
+        val distanceLabel = TextView(context).apply {
+            text = if (isSpanish) "Distancia de Alerta" else "Alert Distance"
             textSize = 16f
+            setTextColor(Color.parseColor("#333333"))
+            setPadding(0, 0, 0, 8)
+            typeface = android.graphics.Typeface.DEFAULT_BOLD
+        }
+        dialogLayout.addView(distanceLabel)
+
+        val currentAlertDistance = preferencesManager.getAlertDistanceText(preferencesManager.getSavedAlertDistance())
+        val distanceDisplay = TextView(context).apply {
+            text = currentAlertDistance
+            textSize = 14f
+            setTextColor(Color.parseColor("#666666"))
+            setPadding(16, 12, 16, 12)
+            setBackgroundColor(Color.parseColor("#F5F5F5"))
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            ).apply {
+                setMargins(0, 0, 0, 20)
+            }
+            isClickable = true
+            isFocusable = true
+            setOnClickListener {
+                showAlertDistanceDialog { distance ->
+                    preferencesManager.saveAlertDistance(distance)
+                    text = preferencesManager.getAlertDistanceText(distance)
+                }
+            }
+        }
+        dialogLayout.addView(distanceDisplay)
+
+        // Alarm Override Section
+        val alarmLabel = TextView(context).apply {
+            text = if (isSpanish) "Configuración de Alarma" else "Alarm Settings"
+            textSize = 16f
+            setTextColor(Color.parseColor("#333333"))
+            setPadding(0, 0, 0, 12)
+            typeface = android.graphics.Typeface.DEFAULT_BOLD
+        }
+        dialogLayout.addView(alarmLabel)
+
+        val alarmLayout = LinearLayout(context).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = android.view.Gravity.CENTER_VERTICAL
+            setPadding(16, 12, 16, 12)
+            setBackgroundColor(Color.parseColor("#F5F5F5"))
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            ).apply {
+                setMargins(0, 0, 0, 8)
+            }
+        }
+
+        val alarmSwitchLabel = TextView(context).apply {
+            text = if (isSpanish) "Alarma anula modo silencio" else "Alarm overrides silent mode"
+            textSize = 14f
+            setTextColor(Color.parseColor("#333333"))
+            layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
+        }
+
+        val alarmSwitch = com.google.android.material.materialswitch.MaterialSwitch(context).apply {
+            isChecked = preferencesManager.getAlarmOverrideSilent()
+            setOnCheckedChangeListener { _, isChecked ->
+                preferencesManager.saveAlarmOverrideSilent(isChecked)
+            }
+        }
+
+        alarmLayout.addView(alarmSwitchLabel)
+        alarmLayout.addView(alarmSwitch)
+        dialogLayout.addView(alarmLayout)
+
+        // Alarm description
+        val alarmDescription = TextView(context).apply {
+            text = if (isSpanish) {
+                "Cuando está activado, las alertas reproducirán un sonido fuerte incluso en modo silencio"
+            } else {
+                "When enabled, alerts will play a loud sound even in silent mode"
+            }
+            textSize = 12f
+            setTextColor(Color.parseColor("#888888"))
+            setPadding(16, 4, 16, 16)
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            ).apply {
+                setMargins(0, 0, 0, 24)
+            }
+        }
+        dialogLayout.addView(alarmDescription)
+
+        // Info Section
+        val infoText = TextView(context).apply {
+            text = if (isSpanish) {
+                "Las alertas se activarán cuando se reporten incidentes dentro de tu distancia elegida"
+            } else {
+                "Alerts will trigger when incidents are reported within your chosen distance"
+            }
+            textSize = 14f
             setTextColor(Color.parseColor("#666666"))
             setPadding(16, 16, 16, 16)
             setBackgroundColor(Color.parseColor("#F5F5F5"))
@@ -1369,14 +1464,10 @@ class DialogManager(
                 setMargins(0, 0, 0, 24)
             }
         }
-        dialogLayout.addView(messageText)
+        dialogLayout.addView(infoText)
 
-        val buttonLayout = LinearLayout(context).apply {
-            orientation = LinearLayout.HORIZONTAL
-            gravity = android.view.Gravity.CENTER
-        }
-
-        val btnCancel = Button(context).apply {
+        // Close Button
+        val btnClose = Button(context).apply {
             text = if (isSpanish) "Cerrar" else "Close"
             setTextColor(Color.parseColor("#666666"))
             setBackgroundColor(Color.TRANSPARENT)
@@ -1385,20 +1476,10 @@ class DialogManager(
                 LinearLayout.LayoutParams.WRAP_CONTENT,
                 LinearLayout.LayoutParams.WRAP_CONTENT
             ).apply {
-                setMargins(0, 0, 16, 0)
+                gravity = android.view.Gravity.CENTER_HORIZONTAL
             }
         }
-
-        val btnOk = Button(context).apply {
-            text = "OK"
-            setTextColor(Color.WHITE)
-            setBackgroundColor(Color.parseColor("#4CAF50"))
-            setPadding(32, 16, 32, 16)
-        }
-
-        buttonLayout.addView(btnCancel)
-        buttonLayout.addView(btnOk)
-        dialogLayout.addView(buttonLayout)
+        dialogLayout.addView(btnClose)
 
         val dialog = AlertDialog.Builder(context)
             .setView(dialogLayout)
@@ -1407,18 +1488,7 @@ class DialogManager(
 
         dialog.window?.setBackgroundDrawableResource(android.R.color.transparent)
 
-        btnCancel.setOnClickListener { dialog.dismiss() }
-        btnOk.setOnClickListener {
-            dialog.dismiss()
-            showAlertDistanceDialog { distance ->
-                preferencesManager.saveAlertDistance(distance)
-                // Show confirmation feedback
-                Toast.makeText(context,
-                    if (isSpanish) "Distancia actualizada" else "Distance updated",
-                    Toast.LENGTH_SHORT).show()
-            }
-        }
-
+        btnClose.setOnClickListener { dialog.dismiss() }
         dialog.show()
     }
 
