@@ -438,9 +438,27 @@ class MainActivity : AppCompatActivity(),
             preferencesManager.getSavedLanguage() == "es"
         )
         showStatusCard(message, isLoading = false)
+
+        // Check for Safety alerts in favorites and trigger alarm
+        val isSpanish = preferencesManager.getSavedLanguage() == "es"
+        val title = if (isSpanish) "Alerta en Favorito" else "Alert at Favorite"
+
+        // Check if any favorite alert is a safety alert
+        val hasSafetyAlert = alerts.any { it.report.category == ReportCategory.SAFETY }
+        val category = if (hasSafetyAlert) "SAFETY" else alerts.first().report.category.code.uppercase()
+
+        if (hasSafetyAlert) {
+            // Safety alerts at favorites check the alarm override setting
+            alarmManager.triggerAlert(title, message, category)
+            android.util.Log.d("MainActivity", "Safety alert at favorite - checking alarm override setting")
+        } else {
+            // Fun/Lost alerts at favorites ALWAYS use silent notification
+            alarmManager.triggerSilentNotification(title, message, category)
+            android.util.Log.d("MainActivity", "Non-safety alert at favorite - using silent notification only")
+        }
+
         Handler(Looper.getMainLooper()).postDelayed({ hideStatusCard() }, 3000)
     }
-
     // MapManager.MapInteractionListener Implementation
     override fun onLongPress(location: GeoPoint) {
         hideInstructionOverlay()  // NEW: Hide on map interaction

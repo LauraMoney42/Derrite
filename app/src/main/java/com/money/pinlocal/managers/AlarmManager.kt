@@ -106,11 +106,17 @@ class AlarmManager(
     }
 
     private fun triggerHighPriorityAlarm(title: String, message: String, category: String, isSpanish: Boolean) {
-        // Play alarm sound that overrides silent mode
+        // Force volume to maximum for emergency
+        val audioManager = context.getSystemService(Context.AUDIO_SERVICE) as AudioManager
+        val originalVolume = audioManager.getStreamVolume(AudioManager.STREAM_ALARM)
+        val maxVolume = audioManager.getStreamMaxVolume(AudioManager.STREAM_ALARM)
+        audioManager.setStreamVolume(AudioManager.STREAM_ALARM, maxVolume, 0)
+
+        // Play more intense alarm
         playAlarmSound()
 
-        // Trigger strong vibration
-        triggerAlarmVibration()
+        // Stronger vibration pattern
+        triggerIntenseVibration()
 
         // Show high priority notification
         val intent = Intent(context, MainActivity::class.java).apply {
@@ -135,7 +141,7 @@ class AlarmManager(
             .setContentIntent(pendingIntent)
             .setDefaults(NotificationCompat.DEFAULT_ALL)
             .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
-            .setFullScreenIntent(pendingIntent, true) // Shows as heads-up even in DND
+            .setFullScreenIntent(pendingIntent, true)
             .addAction(
                 R.drawable.ic_notifications,
                 if (isSpanish) "Ver Alertas" else "View Alerts",
@@ -145,13 +151,32 @@ class AlarmManager(
 
         notificationManager.notify(NOTIFICATION_ID_ALERT, notification)
 
-        // Auto-stop alarm after duration
+        // Auto-stop alarm after longer duration and restore volume
         alarmJob = CoroutineScope(Dispatchers.Main).launch {
-            delay(ALARM_DURATION_MS)
+            delay(5000L) // 5 seconds instead of 3
             stopAlarmSound()
+            audioManager.setStreamVolume(AudioManager.STREAM_ALARM, originalVolume, 0)
         }
     }
 
+    private fun triggerIntenseVibration() {
+        try {
+            val vibrator = ContextCompat.getSystemService(context, Vibrator::class.java)
+            vibrator?.let { v ->
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                    // More intense vibration pattern - longer bursts
+                    val pattern = longArrayOf(0, 1000, 300, 1000, 300, 1000, 300, 1000)
+                    val effect = VibrationEffect.createWaveform(pattern, -1)
+                    v.vibrate(effect)
+                } else {
+                    @Suppress("DEPRECATION")
+                    v.vibrate(longArrayOf(0, 1000, 300, 1000, 300, 1000, 300, 1000), -1)
+                }
+            }
+        } catch (e: Exception) {
+            android.util.Log.e("AlarmManager", "Error triggering intense vibration: ${e.message}")
+        }
+    }
     private fun triggerNormalNotification(title: String, message: String, category: String, isSpanish: Boolean) {
         val intent = Intent(context, MainActivity::class.java).apply {
             flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
@@ -186,8 +211,9 @@ class AlarmManager(
         try {
             stopAlarmSound() // Stop any existing alarm
 
-            // Get alarm sound URI
+            // Try to get the most urgent/alarming sound available
             val alarmUri = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_ALARM)
+                ?: RingtoneManager.getDefaultUri(RingtoneManager.TYPE_RINGTONE) // Often more urgent than notification
                 ?: RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION)
 
             alarmPlayer = MediaPlayer().apply {
@@ -202,6 +228,7 @@ class AlarmManager(
                 )
 
                 isLooping = true
+                setVolume(1.0f, 1.0f) // Maximum volume
                 prepareAsync()
 
                 setOnPreparedListener { player ->
@@ -209,7 +236,6 @@ class AlarmManager(
                 }
 
                 setOnErrorListener { _, _, _ ->
-                    // Fallback to system notification sound
                     playFallbackSound()
                     true
                 }
@@ -219,7 +245,6 @@ class AlarmManager(
             playFallbackSound()
         }
     }
-
     private fun playFallbackSound() {
         try {
             val audioManager = context.getSystemService(Context.AUDIO_SERVICE) as AudioManager
@@ -241,25 +266,6 @@ class AlarmManager(
             }
         } catch (e: Exception) {
             android.util.Log.e("AlarmManager", "Error playing fallback sound: ${e.message}")
-        }
-    }
-
-    private fun triggerAlarmVibration() {
-        try {
-            val vibrator = ContextCompat.getSystemService(context, Vibrator::class.java)
-            vibrator?.let { v ->
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                    // Strong vibration pattern for alarm
-                    val pattern = longArrayOf(0, 500, 200, 500, 200, 500, 200, 500)
-                    val effect = VibrationEffect.createWaveform(pattern, -1)
-                    v.vibrate(effect)
-                } else {
-                    @Suppress("DEPRECATION")
-                    v.vibrate(longArrayOf(0, 500, 200, 500, 200, 500, 200, 500), -1)
-                }
-            }
-        } catch (e: Exception) {
-            android.util.Log.e("AlarmManager", "Error triggering vibration: ${e.message}")
         }
     }
 
