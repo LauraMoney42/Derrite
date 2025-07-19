@@ -161,14 +161,6 @@ class MainActivity : AppCompatActivity(),
 
         mapManager.addReportToMap(mapView, report, this)
         preferencesManager.setUserHasCreatedReports(true)
-
-        val message = if (preferencesManager.getSavedLanguage() == "es") {
-            "Enviando al servidor..."
-        } else {
-            "Sending to server..."
-        }
-        showStatusCard(message, isLoading = true)
-
         backendClient.submitReport(
             latitude = location.latitude,
             longitude = location.longitude,
@@ -178,22 +170,11 @@ class MainActivity : AppCompatActivity(),
             category = category
         ) { success: Boolean, message: String ->
             runOnUiThread {
-                val resultMessage = if (success) {
-                    if (preferencesManager.getSavedLanguage() == "es") "Enviado al servidor"
-                    else "Sent to server"
-                } else {
-                    if (preferencesManager.getSavedLanguage() == "es") "Error de conexión"
-                    else "Connection error"
-                }
-                showStatusCard(resultMessage, isError = !success)
 
                 if (success) {
                     subscribeToAlertsForLocation(location.latitude, location.longitude)
-
-                    // Check if this new report affects any favorites
                     favoriteManager.checkForFavoriteAlerts()
                 }
-
                 Handler(Looper.getMainLooper()).postDelayed({ hideStatusCard() }, 3000)
             }
         }
