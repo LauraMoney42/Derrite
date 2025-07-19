@@ -27,7 +27,7 @@ class PreferencesManager(private val context: Context) {
         const val ALERT_DISTANCE_2_MILES = 3218.0
         const val ALERT_DISTANCE_3_MILES = 4827.0
         const val ALERT_DISTANCE_5_MILES = 8047.0
-        const val ALERT_DISTANCE_ZIP_CODE = 8050.0
+        const val ALERT_DISTANCE_20_MILES = 32187.0
         const val ALERT_DISTANCE_STATE = 160934.0
     }
 
@@ -61,7 +61,7 @@ class PreferencesManager(private val context: Context) {
     }
     // Alert distance preferences
     fun getSavedAlertDistance(): Double {
-        return preferences.getFloat(KEY_ALERT_DISTANCE, ALERT_DISTANCE_ZIP_CODE.toFloat()).toDouble()
+        return preferences.getFloat(KEY_ALERT_DISTANCE, ALERT_DISTANCE_20_MILES.toFloat()).toDouble()
     }
 
     fun saveAlertDistance(distance: Double) {
@@ -76,7 +76,7 @@ class PreferencesManager(private val context: Context) {
             ALERT_DISTANCE_2_MILES -> if (isSpanish) "2 millas" else "2 miles"
             ALERT_DISTANCE_3_MILES -> if (isSpanish) "3 millas" else "3 miles"
             ALERT_DISTANCE_5_MILES -> if (isSpanish) "5 millas" else "5 miles"
-            ALERT_DISTANCE_ZIP_CODE -> if (isSpanish) "área de código postal" else "zip code area"
+            ALERT_DISTANCE_20_MILES -> if (isSpanish) "20 millas" else "20 miles"
             ALERT_DISTANCE_STATE -> if (isSpanish) "todo el estado" else "state-wide"
             else -> if (isSpanish) "área de código postal (predeterminado)" else "zip code area (default)"
         }

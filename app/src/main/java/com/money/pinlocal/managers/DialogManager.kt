@@ -1261,7 +1261,7 @@ class DialogManager(
                 "2 MILLAS",
                 "3 MILLAS",
                 "5 MILLAS",
-                "ÁREA DE CÓDIGO POSTAL",
+                "20 MILLAS",
                 "TODO EL ESTADO"
             )
         } else {
@@ -1270,7 +1270,7 @@ class DialogManager(
                 "2 MILES",
                 "3 MILES",
                 "5 MILES",
-                "ZIP CODE AREA",
+                "20 MILES",
                 "STATE-WIDE"
             )
         }
@@ -1280,7 +1280,7 @@ class DialogManager(
             3218.0,    // 2 miles
             4827.0,    // 3 miles
             8047.0,    // 5 miles
-            8050.0,    // zip code area
+            32187.0,   // 20 miles
             160934.0   // state-wide
         )
 
@@ -1358,7 +1358,6 @@ class DialogManager(
             textSize = 16f
             setTextColor(Color.parseColor("#333333"))
             setPadding(0, 0, 0, 8)
-            typeface = android.graphics.Typeface.DEFAULT_BOLD
         }
         dialogLayout.addView(distanceLabel)
 
@@ -1392,7 +1391,6 @@ class DialogManager(
             textSize = 16f
             setTextColor(Color.parseColor("#333333"))
             setPadding(0, 0, 0, 12)
-            typeface = android.graphics.Typeface.DEFAULT_BOLD
         }
         dialogLayout.addView(alarmLabel)
 
@@ -1480,9 +1478,9 @@ class DialogManager(
         // Info Section
         val infoText = TextView(context).apply {
             text = if (isSpanish) {
-                "Las alertas se activarán cuando se reporten incidentes dentro de tu distancia elegida"
+                "Las alertas se activarán cuando se reporten incidentes cerca de tu ubicación actual o de tus lugares favoritos, dentro de tu distancia elegida"
             } else {
-                "Alerts will trigger when incidents are reported within your chosen distance"
+                "Alerts will trigger when incidents are reported near your current location or your favorite places, within your chosen distance"
             }
             textSize = 14f
             setTextColor(Color.parseColor("#666666"))
@@ -1577,6 +1575,11 @@ class DialogManager(
             setPadding(16, 16, 16, 16)
             setBackgroundColor(Color.parseColor("#F5F5F5"))
             setLineSpacing(4f, 1f)
+
+            // Make links clickable
+            autoLinkMask = android.text.util.Linkify.WEB_URLS
+            movementMethod = android.text.method.LinkMovementMethod.getInstance()
+            setLinkTextColor(Color.parseColor("#007AFF")) // Blue color
         }
         scrollView.addView(contentText)
         dialogLayout.addView(scrollView)
@@ -1645,7 +1648,7 @@ class DialogManager(
     private fun getUserGuideContent(): String {
         val isSpanish = preferencesManager.getSavedLanguage() == "es"
         return if (isSpanish) {
-            "PIN A LOCATION\n" +
+            "MARCAR UNA UBICACIÓN\n" +
                     "• Presiona y mantén presionado en cualquier lugar del mapa para crear un pin\n" +
                     "• Selecciona una categoría: Seguridad (rojo), Diversión (morado), o Perdido/Desaparecido (azul)\n" +
                     "• Agrega una descripción de la situación\n" +
@@ -1656,8 +1659,10 @@ class DialogManager(
                     "• Recibe notificaciones cuando algo pase cerca\n\n" +
                     "ALERTAS\n" +
                     "• Recibe notificaciones cuando se hagan pines dentro de tu distancia elegida\n" +
+                    "• Recibe alertas automáticas de seguridad cuando algo suceda cerca de tu ubicación actual y tus lugares favoritos\n" +
                     "• Personaliza la distancia de alerta en Configuración\n" +
-                    "• Activa 'Anular modo silencio' en Configuración para que las alertas de seguridad suenen incluso cuando tu teléfono esté en silencio\n\n" +
+                    "• Las alertas de seguridad pueden sonar con volumen alto incluso cuando tu teléfono esté en modo silencio o no molestar\n" +
+                    "• Puedes activar o desactivar esta función en Configuración > Preferencias > 'Alarma anula modo silencio'\n\n" +
                     "PRIVACIDAD\n" +
                     "• Completamente anónimo - no se requieren nombres de usuario\n" +
                     "• No se guardan direcciones IP, IDs de dispositivo, o información personal\n" +
@@ -1676,8 +1681,10 @@ class DialogManager(
                     "• Get notified when something happens nearby\n\n" +
                     "ALERTS\n" +
                     "• Get notified when pins are made within your chosen distance\n" +
+                    "• Receive automatic safety alerts when something happens near your current location and your favorite places\n" +
                     "• Customize alert distance in Settings\n" +
-                    "• Turn on 'Alarm overrides silent mode' in Settings to make safety alerts sound even when your phone is on silent\n\n" +
+                    "• Safety alerts can sound at full volume even when your phone is on silent or do not disturb mode\n" +
+                    "• You can enable or disable this feature in Settings > Preferences > 'Alarm overrides silent mode'\n\n" +
                     "PRIVACY\n" +
                     "• Completely anonymous - no usernames required\n" +
                     "• No IP addresses, device IDs, or personal information is stored\n" +
@@ -1686,6 +1693,7 @@ class DialogManager(
                     "• All pins automatically delete after 8 hours"
         }
     }
+
     private fun getPrivacyPolicyContent(): String {
         val isSpanish = preferencesManager.getSavedLanguage() == "es"
         return if (isSpanish) {
@@ -1726,29 +1734,33 @@ class DialogManager(
     private fun getAboutContent(): String {
         val isSpanish = preferencesManager.getSavedLanguage() == "es"
         return if (isSpanish) {
-            "Acerca de PinLocal\n\n" +
-                    "MISIÓN\n" +
-                    "PinLocal es una plataforma de reportes anónima y privada, diseñada para ayudar a las comunidades a mantenerse informadas sobre problemas locales.\n\n" +
+            "MISIÓN\n" +
+                    "PinLocal es una plataforma de pines anónima y privada, diseñada para ayudar a las comunidades a mantenerse informadas sobre problemas locales.\n\n" +
                     "CARACTERÍSTICAS\n" +
-                    "• Reportes anónimos con categorías\n" +
+                    "• Pines de ubicación anónimos con categorías\n" +
                     "• Lugares favoritos con alertas personalizadas\n" +
                     "• Alertas en tiempo real\n" +
                     "• Soporte bilingüe (Español/Inglés)\n" +
                     "• Protección completa de privacidad\n\n" +
+                    "ALERTAS DE SEGURIDAD EN SEGUNDO PLANO\n" +
+                    "Incluso cuando la aplicación no está abierta, recibirás alertas automáticas de seguridad para tus lugares favoritos. El sistema monitorea continuamente tu área y lugares importantes, enviando notificaciones inmediatas cuando se reportan problemas de seguridad cerca.\n\n" +
                     "PRIVACIDAD PRIMERO\n" +
-                    "Construido desde cero con la privacidad como principio fundamental. Nunca se almacenan, rastrean o comparten datos de usuario."
+                    "Construido desde cero con la privacidad como principio fundamental. Nunca se almacenan, rastrean o comparten datos de usuario.\n\n" +
+                    "kindcode.us"
         } else {
-            "About PinLocal\n\n" +
-                    "MISSION\n" +
-                    "PinLocal is a privacy-first, anonymous reporting platform designed to help communities stay informed about local concerns.\n\n" +
+            "MISSION\n" +
+                    "PinLocal is a privacy-first, anonymous pinning platform designed to help communities stay informed about local concerns.\n\n" +
                     "FEATURES\n" +
-                    "• Anonymous reporting with categories\n" +
+                    "• Anonymous location pinning with categories\n" +
                     "• Favorite places with custom alerts\n" +
                     "• Real-time alerts\n" +
                     "• Bilingual support (Spanish/English)\n" +
                     "• Complete privacy protection\n\n" +
+                    "BACKGROUND SAFETY ALERTS\n" +
+                    "Even when the app isn't open, you'll receive automatic safety alerts for your favorite places. The system continuously monitors your area and important locations, sending immediate notifications when safety concerns are reported nearby.\n\n" +
                     "PRIVACY FIRST\n" +
-                    "Built from the ground up with privacy as the core principle. No user data is ever stored, tracked, or shared."
+                    "Built from the ground up with privacy as the core principle. No user data is ever stored, tracked, or shared.\n\n" +
+                    "kindcode.us"
+        }
         }
     }
-}

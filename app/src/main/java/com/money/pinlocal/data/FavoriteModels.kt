@@ -25,7 +25,7 @@ data class FavoritePlace(
             3218.0 -> if (isSpanish) "2 millas" else "2 miles"
             4827.0 -> if (isSpanish) "3 millas" else "3 miles"
             8047.0 -> if (isSpanish) "5 millas" else "5 miles"
-            8050.0 -> if (isSpanish) "área de código postal" else "zip code area"
+            32187.0 -> if (isSpanish) "20 millas" else "20 miles"
             160934.0 -> if (isSpanish) "todo el estado" else "state-wide"
             else -> if (isSpanish) "distancia personalizada" else "custom distance"
         }
