@@ -405,28 +405,25 @@ class MainActivity : AppCompatActivity(),
         )
         showStatusCard(message, isLoading = false)
 
-        // ADD THIS: Trigger the actual alarm
         val isSpanish = preferencesManager.getSavedLanguage() == "es"
         val title = if (isSpanish) "Nueva Alerta" else "New Alert"
 
-        // Get the most urgent category
-        val hasUrgentAlert = alerts.any { it.report.category == ReportCategory.SAFETY }
-        val category = if (hasUrgentAlert) "SAFETY" else alerts.first().report.category.code.uppercase()
+        // Check if any alert is a safety alert
+        val hasSafetyAlert = alerts.any { it.report.category == ReportCategory.SAFETY }
+        val category = if (hasSafetyAlert) "SAFETY" else alerts.first().report.category.code.uppercase()
 
-        alarmManager.triggerAlert(title, message, category)
+        if (hasSafetyAlert) {
+            // Safety alerts check the alarm override setting
+            alarmManager.triggerAlert(title, message, category)
+            android.util.Log.d("MainActivity", "Safety alert - checking alarm override setting")
+        } else {
+            // Fun/Lost alerts ALWAYS use silent notification (ignore override setting)
+            alarmManager.triggerSilentNotification(title, message, category)
+            android.util.Log.d("MainActivity", "Non-safety alert - using silent notification only")
+        }
 
         Handler(Looper.getMainLooper()).postDelayed({ hideStatusCard() }, 3000)
     }
-//    // AlertManager.AlertListener Implementation
-//    override fun onNewAlerts(alerts: List<Alert>) {
-//        val message = alertManager.getAlertSummaryMessage(
-//            alerts,
-//            preferencesManager.getSavedLanguage() == "es"
-//        )
-//        showStatusCard(message, isLoading = false)
-//        Handler(Looper.getMainLooper()).postDelayed({ hideStatusCard() }, 3000)
-//    }
-
     override fun onAlertsUpdated(hasUnviewed: Boolean) {
         updateAlertsButtonColor(hasUnviewed)
     }
