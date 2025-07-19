@@ -16,6 +16,7 @@
 
     <!-- Notification permission for safety alerts -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <uses-permission android:name="android.permission.VIBRATE" />
 
     <!-- External storage for OSMDroid map caching -->
     <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE"

@@ -74,7 +74,7 @@ class MainActivity : AppCompatActivity(),
     private lateinit var backendClient: BackendClient
     private lateinit var dialogManager: DialogManager
     private lateinit var translationManager: TranslationManager
-
+    private lateinit var alarmManager: AlarmManager
     // State
     private var selectedCategory: ReportCategory = ReportCategory.SAFETY
     private var hasInitialLocationSet = false
@@ -110,7 +110,7 @@ class MainActivity : AppCompatActivity(),
         favoriteManager = FavoriteManager(preferencesManager, reportManager, locationManager, backendClient)
         dialogManager = DialogManager(this, preferencesManager)
         translationManager = TranslationManager(this)
-
+        alarmManager = AlarmManager(this, preferencesManager)
         // Set listeners
         alertManager.setAlertListener(this)
         favoriteManager.setFavoriteListener(this)
@@ -398,16 +398,34 @@ class MainActivity : AppCompatActivity(),
     override fun onLocationError(error: String) {
         android.util.Log.e("PinLocal", "Location error: $error")
     }
-
-    // AlertManager.AlertListener Implementation
     override fun onNewAlerts(alerts: List<Alert>) {
         val message = alertManager.getAlertSummaryMessage(
             alerts,
             preferencesManager.getSavedLanguage() == "es"
         )
         showStatusCard(message, isLoading = false)
+
+        // ADD THIS: Trigger the actual alarm
+        val isSpanish = preferencesManager.getSavedLanguage() == "es"
+        val title = if (isSpanish) "Nueva Alerta" else "New Alert"
+
+        // Get the most urgent category
+        val hasUrgentAlert = alerts.any { it.report.category == ReportCategory.SAFETY }
+        val category = if (hasUrgentAlert) "SAFETY" else alerts.first().report.category.code.uppercase()
+
+        alarmManager.triggerAlert(title, message, category)
+
         Handler(Looper.getMainLooper()).postDelayed({ hideStatusCard() }, 3000)
     }
+//    // AlertManager.AlertListener Implementation
+//    override fun onNewAlerts(alerts: List<Alert>) {
+//        val message = alertManager.getAlertSummaryMessage(
+//            alerts,
+//            preferencesManager.getSavedLanguage() == "es"
+//        )
+//        showStatusCard(message, isLoading = false)
+//        Handler(Looper.getMainLooper()).postDelayed({ hideStatusCard() }, 3000)
+//    }
 
     override fun onAlertsUpdated(hasUnviewed: Boolean) {
         updateAlertsButtonColor(hasUnviewed)
@@ -848,6 +866,7 @@ class MainActivity : AppCompatActivity(),
         try {
             locationManager.stopLocationUpdates()
             translationManager.cleanup()
+            alarmManager.cleanup()
             mapView.onDetach()
         } catch (e: Exception) {
             android.util.Log.e("PinLocal", "Error in onDestroy: ${e.message}")
