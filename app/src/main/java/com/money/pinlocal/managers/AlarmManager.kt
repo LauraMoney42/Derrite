@@ -81,12 +81,13 @@ class AlarmManager(
         }
     }
 
-    // Main method to trigger alert - checks user preference
+// Main method to trigger alert - checks user preference AND category
     fun triggerAlert(title: String, message: String, category: String = "SAFETY") {
         val isSpanish = preferencesManager.getSavedLanguage() == "es"
         val shouldOverrideSilent = preferencesManager.getAlarmOverrideSilent()
 
-        if (shouldOverrideSilent) {
+        // Only override silent mode for SAFETY alerts AND if user has enabled the setting
+        if (shouldOverrideSilent && category.uppercase() == "SAFETY") {
             triggerHighPriorityAlarm(title, message, category, isSpanish)
         } else {
             triggerNormalNotification(title, message, category, isSpanish)

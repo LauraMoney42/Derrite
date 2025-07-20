@@ -1,7 +1,7 @@
 // File: managers/DialogManager.kt (Complete with Rounded Corners and Fixed Distance Selection)
 package com.money.pinlocal.managers
 
-
+import android.util.Base64
 import com.money.pinlocal.BackendClient
 import android.app.AlertDialog
 import android.content.Context
@@ -111,11 +111,12 @@ class DialogManager(
         location: GeoPoint,
         selectedCategory: ReportCategory,
         onCategoryChange: (ReportCategory) -> Unit,
-        onPhotoRequest: () -> Unit,
+        onPhotoRequest: (onPhotoSelected: (Bitmap) -> Unit) -> Unit,
         onSubmit: (GeoPoint, String, Bitmap?, ReportCategory) -> Unit
     ) {
         val isSpanish = preferencesManager.getSavedLanguage() == "es"
         var currentCategory = selectedCategory
+        var selectedPhoto: Bitmap? = null
 
         val dialogLayout = LinearLayout(context).apply {
             orientation = LinearLayout.VERTICAL
@@ -214,7 +215,37 @@ class DialogManager(
         }
         dialogLayout.addView(editReportText)
 
-        // Add Photo button
+        // Photo preview container
+        val photoPreviewContainer = LinearLayout(context).apply {
+            orientation = LinearLayout.VERTICAL
+            visibility = android.view.View.GONE
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            ).apply {
+                setMargins(0, 0, 0, 16)
+            }
+        }
+
+        val photoPreview = android.widget.ImageView(context).apply {
+            layoutParams = LinearLayout.LayoutParams(200, 200).apply {
+                gravity = android.view.Gravity.CENTER_HORIZONTAL
+            }
+            scaleType = android.widget.ImageView.ScaleType.CENTER_CROP
+            setBackgroundColor(Color.parseColor("#F5F5F5"))
+        }
+        photoPreviewContainer.addView(photoPreview)
+
+        val photoStatus = TextView(context).apply {
+            text = if (isSpanish) "✅ Foto seleccionada" else "✅ Photo selected"
+            textSize = 14f
+            setTextColor(Color.parseColor("#4CAF50"))
+            gravity = android.view.Gravity.CENTER
+            setPadding(0, 8, 0, 8)
+        }
+        photoPreviewContainer.addView(photoStatus)
+
+        // DEFINE btnAddPhoto BEFORE using it
         val btnAddPhoto = Button(context).apply {
             text = if (isSpanish) "Agregar Foto" else "Add Photo"
             setTextColor(Color.parseColor("#666666"))
@@ -228,6 +259,29 @@ class DialogManager(
                 setMargins(0, 0, 0, 24)
             }
         }
+
+        val removePhotoButton = Button(context).apply {
+            text = if (isSpanish) "Remover Foto" else "Remove Photo"
+            setTextColor(Color.parseColor("#FF3B30"))
+            setBackgroundColor(Color.TRANSPARENT)
+            textSize = 14f
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.WRAP_CONTENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            ).apply {
+                gravity = android.view.Gravity.CENTER_HORIZONTAL
+                setMargins(0, 8, 0, 0)
+            }
+            setOnClickListener {
+                selectedPhoto = null
+                photoPreviewContainer.visibility = android.view.View.GONE
+                btnAddPhoto.text = if (isSpanish) "Agregar Foto" else "Add Photo"
+            }
+        }
+        photoPreviewContainer.addView(removePhotoButton)
+
+        // Add views to dialog
+        dialogLayout.addView(photoPreviewContainer)
         dialogLayout.addView(btnAddPhoto)
 
         // Buttons layout
@@ -268,15 +322,29 @@ class DialogManager(
 
         dialog.window?.setBackgroundDrawableResource(android.R.color.transparent)
 
-        btnAddPhoto.setOnClickListener { onPhotoRequest() }
+        // NOW set click listeners (after all views are defined)
+        btnAddPhoto.setOnClickListener {
+            onPhotoRequest { bitmap ->
+                selectedPhoto = bitmap
+                photoPreview.setImageBitmap(bitmap)
+                photoPreviewContainer.visibility = android.view.View.VISIBLE
+                btnAddPhoto.text = if (isSpanish) "Cambiar Foto" else "Change Photo"
+
+                android.util.Log.d("DialogManager", "Photo received in dialog: ${bitmap.width}x${bitmap.height}")
+            }
+        }
+
         btnCancel.setOnClickListener { dialog.dismiss() }
+
         btnSubmit.setOnClickListener {
             val reportText = editReportText.text?.toString()?.trim()
             if (reportText.isNullOrEmpty()) {
                 editReportText.error = if (isSpanish) "Ingresa una descripción" else "Enter a description"
                 return@setOnClickListener
             }
-            onSubmit(location, reportText, null, currentCategory)
+
+            android.util.Log.d("DialogManager", "Submitting report with photo: ${selectedPhoto != null}")
+            onSubmit(location, reportText, selectedPhoto, currentCategory)
             dialog.dismiss()
         }
 
@@ -973,6 +1041,39 @@ class DialogManager(
             }
         }
         dialogLayout.addView(textReportContent)
+
+        // ADD PHOTO DISPLAY
+        if (report.hasPhoto && report.photo != null) {
+            val photoLabel = TextView(context).apply {
+                text = if (isSpanish) "Foto" else "Photo"
+                textSize = 16f
+                setTextColor(Color.parseColor("#333333"))
+                setPadding(0, 0, 0, 8)
+            }
+            dialogLayout.addView(photoLabel)
+
+            val photoImageView = android.widget.ImageView(context).apply {
+                layoutParams = LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT,
+                    400
+                ).apply {
+                    setMargins(0, 0, 0, 24)
+                }
+                scaleType = android.widget.ImageView.ScaleType.CENTER_CROP
+                setBackgroundColor(Color.parseColor("#F5F5F5"))
+            }
+
+            try {
+                // Just set the bitmap directly if it exists
+                photoImageView.setImageBitmap(report.photo)
+                android.util.Log.d("DialogManager", "Photo displayed successfully")
+            } catch (e: Exception) {
+                android.util.Log.e("DialogManager", "Error displaying photo: ${e.message}")
+                photoImageView.visibility = android.view.View.GONE
+            }
+
+            dialogLayout.addView(photoImageView)
+        }
 
         // Translate button
         val btnTranslate = Button(context).apply {
@@ -1705,13 +1806,19 @@ class DialogManager(
                     "• Las coordenadas GPS nunca se almacenan en nuestros servidores\n" +
                     "• Solo se usan zonas anónimas de 500m para procesamiento\n" +
                     "• Los nombres de lugares favoritos se guardan solo en tu teléfono\n\n" +
+                    "PROTECCIÓN DE FOTOS\n" +
+                    "• Toda información oculta se elimina de las fotos antes de enviarlas\n" +
+                    "• Tu teléfono borra datos como ubicación GPS de la imagen\n" +
+                    "• El servidor también elimina cualquier información personal restante\n" +
+                    "• Solo se guarda la imagen sin datos personales\n\n" +
                     "ALMACENAMIENTO DE DATOS\n" +
                     "• Todos los pines se auto-eliminan después de 8 horas\n" +
                     "• No hay almacenamiento permanente de datos de usuario\n" +
                     "• Los favoritos no se almacenan en nuestros servidores\n\n" +
                     "RECOMENDACIONES DE PRIVACIDAD\n" +
                     "• Usa nombres genéricos como 'Lugar 1' en lugar de 'Casa' o 'Escuela'\n" +
-                    "• Evita incluir información personal en las descripciones de pines"
+                    "• Evita incluir información personal en las descripciones de pines\n" +
+                    "• Las fotos son seguras - toda información personal se elimina automáticamente"
         } else {
             "ANONYMOUS BY DESIGN\n" +
                     "• No user accounts or registration required\n" +
@@ -1721,13 +1828,19 @@ class DialogManager(
                     "• GPS coordinates are never stored on our servers\n" +
                     "• Only anonymous 500m zones are used for processing\n" +
                     "• Favorite place names are saved only on your phone\n\n" +
+                    "PHOTO PROTECTION\n" +
+                    "• All hidden information is removed from photos before sending\n" +
+                    "• Your phone deletes data like GPS location from the image\n" +
+                    "• The server also removes any remaining personal information\n" +
+                    "• Only the clean image is saved with no personal data\n\n" +
                     "DATA STORAGE\n" +
                     "• All pins auto-delete after 8 hours\n" +
                     "• No permanent storage of any user data\n" +
                     "• Favorites are not stored on our servers\n\n" +
                     "PRIVACY RECOMMENDATIONS\n" +
                     "• Use generic names like 'Place 1' instead of 'Home' or 'School'\n" +
-                    "• Avoid including personal information in pin descriptions"
+                    "• Avoid including personal information in pin descriptions\n" +
+                    "• Photos are safe - all personal information is automatically removed"
         }
     }
 

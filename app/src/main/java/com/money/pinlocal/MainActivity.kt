@@ -1,4 +1,4 @@
-// File: MainActivity.kt (Fixed - Auto-hide instruction overlay)
+// File: MainActivity.kt (Complete Updated Version with Debugging)
 package com.money.pinlocal
 
 import android.Manifest
@@ -61,7 +61,7 @@ class MainActivity : AppCompatActivity(),
     private lateinit var searchBar: TextInputEditText
     private lateinit var btnSearch: ImageButton
     private lateinit var btnClearSearch: ImageButton
-    private lateinit var instructionOverlay: LinearLayout  // NEW: Instruction overlay reference
+    private lateinit var instructionOverlay: LinearLayout
 
     // Managers
     private lateinit var preferencesManager: PreferencesManager
@@ -75,11 +75,17 @@ class MainActivity : AppCompatActivity(),
     private lateinit var dialogManager: DialogManager
     private lateinit var translationManager: TranslationManager
     private lateinit var alarmManager: AlarmManager
+
     // State
     private var selectedCategory: ReportCategory = ReportCategory.SAFETY
     private var hasInitialLocationSet = false
-    private var hasUserInteracted = false  // NEW: Track user interaction
+    private var hasUserInteracted = false
     private val LOCATION_PERMISSION_REQUEST = 1001
+
+    // Sync state
+    private var isAppInForeground = true
+    private var syncHandler: Handler? = null
+    private var syncRunnable: Runnable? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -126,10 +132,8 @@ class MainActivity : AppCompatActivity(),
         setupStatusCard()
         setupBottomNavigation()
         setupSearchBar()
-        setupInstructionOverlay()  // NEW: Setup instruction overlay
+        setupInstructionOverlay()
     }
-
-// Update MainActivity.kt - Subscribe to favorites on startup:
 
     private fun initializeApp() {
         // Load saved data
@@ -143,43 +147,257 @@ class MainActivity : AppCompatActivity(),
                 translationManager.initialize()
                 autoLocateOnStartup()
                 startTimers()
+                startPeriodicReportSync()
 
                 // Subscribe to all saved favorites for background notifications
                 favoriteManager.subscribeToAllFavorites()
 
+                // FETCH ALL existing reports from server when location is available
+                Handler(Looper.getMainLooper()).postDelayed({
+                    fetchReportsFromServer()
+                }, 3000) // Wait 3 seconds for location/map to be ready
+
                 scheduleInstructionOverlayAutoHide()
             } catch (e: Exception) {
-                android.util.Log.e("PinLocal", "Error in delayed initialization: ${e.message}")
+                android.util.Log.e("MainActivity", "Error in delayed initialization: ${e.message}")
             }
         }, 1000)
     }
 
-    // Keep the createReport method with favorite alert checking:
+    // DEBUG METHOD - Add this to see what's on the map
+    private fun debugMapContents() {
+        try {
+            android.util.Log.d("MainActivity", "=== MAP DEBUG INFO ===")
+            android.util.Log.d("MainActivity", "MapView initialized: ${::mapView.isInitialized}")
+            if (::mapView.isInitialized) {
+                android.util.Log.d("MainActivity", "MapView repository null: ${mapView.repository == null}")
+                android.util.Log.d("MainActivity", "MapView overlays count: ${mapView.overlays.size}")
+
+                mapView.overlays.forEachIndexed { index, overlay ->
+                    when (overlay) {
+                        is org.osmdroid.views.overlay.Marker -> {
+                            android.util.Log.d("MainActivity", "  Overlay $index: Marker '${overlay.title}' at ${overlay.position}")
+                        }
+                        is org.osmdroid.views.overlay.Polygon -> {
+                            android.util.Log.d("MainActivity", "  Overlay $index: Polygon (report circle)")
+                        }
+                        else -> {
+                            android.util.Log.d("MainActivity", "  Overlay $index: ${overlay::class.java.simpleName}")
+                        }
+                    }
+                }
+            }
+
+            // Also log local reports
+            val localReports = reportManager.getActiveReports()
+            android.util.Log.d("MainActivity", "Local reports in ReportManager: ${localReports.size}")
+            localReports.forEach { report ->
+                android.util.Log.d("MainActivity", "  Local: ${report.id} - ${report.category.name} - ${report.originalText.take(20)}...")
+            }
+
+            android.util.Log.d("MainActivity", "=== END MAP DEBUG ===")
+        } catch (e: Exception) {
+            android.util.Log.e("MainActivity", "Error in debugMapContents: ${e.message}")
+        }
+    }
+
+    private fun fetchReportsFromServer() {
+        val isSpanish = preferencesManager.getSavedLanguage() == "es"
+        val fetchMessage = if (isSpanish) "Cargando todos los reportes..." else "Loading all reports..."
+        showStatusCard(fetchMessage, isLoading = true)
+
+        android.util.Log.d("MainActivity", "🚀 INITIAL FETCH - Starting...")
+
+        // Fetch ALL reports globally
+        backendClient.fetchAllReports { success: Boolean, reports: List<Report>, message: String ->
+            runOnUiThread {
+                android.util.Log.d("MainActivity", "🚀 INITIAL FETCH - Result: success=$success, reports=${reports.size}")
+
+                if (success && reports.isNotEmpty()) {
+                    android.util.Log.d("MainActivity", "🚀 INITIAL FETCH - Processing ${reports.size} reports")
+
+                    // Add reports to local storage and map
+                    reports.forEach { report ->
+                        try {
+                            android.util.Log.d("MainActivity", "🚀 Adding initial report: ${report.id} - ${report.category.name}")
+                            reportManager.addReport(report)
+
+                            // Add to map
+                            if (::mapView.isInitialized && mapView.repository != null) {
+                                mapManager.addReportToMap(mapView, report, this)
+                                android.util.Log.d("MainActivity", "🚀 Added to map: ${report.id}")
+                            } else {
+                                android.util.Log.e("MainActivity", "🚀 MapView not ready for initial report: ${report.id}")
+                            }
+                        } catch (e: Exception) {
+                            android.util.Log.e("MainActivity", "🚀 Error processing initial report ${report.id}: ${e.message}")
+                        }
+                    }
+
+                    mapView.post { mapView.invalidate() }
+
+                    val successMessage = if (isSpanish)
+                        "Cargados ${reports.size} reportes globalmente"
+                    else
+                        "Loaded ${reports.size} reports globally"
+                    showStatusCard(successMessage, isLoading = false)
+
+                    Handler(Looper.getMainLooper()).postDelayed({ hideStatusCard() }, 3000)
+
+                } else if (success && reports.isEmpty()) {
+                    android.util.Log.d("MainActivity", "🚀 INITIAL FETCH - No reports found")
+                    val noReportsMessage = if (isSpanish)
+                        "No hay reportes activos"
+                    else
+                        "No active reports"
+                    showStatusCard(noReportsMessage, isLoading = false)
+                    Handler(Looper.getMainLooper()).postDelayed({ hideStatusCard() }, 2000)
+
+                } else {
+                    android.util.Log.e("MainActivity", "🚀 INITIAL FETCH - Failed: $message")
+                    val errorMessage = if (isSpanish)
+                        "Error cargando reportes"
+                    else
+                        "Error loading reports"
+                    showStatusCard(errorMessage, isError = true)
+                    Handler(Looper.getMainLooper()).postDelayed({ hideStatusCard() }, 2000)
+                }
+            }
+        }
+    }
+
+    // ENHANCED SILENT FETCH WITH DEBUGGING
+    private fun fetchReportsFromServerSilently(onComplete: (Boolean) -> Unit) {
+        android.util.Log.d("MainActivity", "=== STARTING SILENT FETCH ===")
+
+        backendClient.fetchAllReports { success: Boolean, reports: List<Report>, message: String ->
+            runOnUiThread {
+                try {
+                    android.util.Log.d("MainActivity", "Silent fetch result: success=$success, reports=${reports.size}, message=$message")
+
+                    if (success && reports.isNotEmpty()) {
+                        var newReportsCount = 0
+                        var skippedReportsCount = 0
+
+                        // Log current reports BEFORE adding new ones
+                        val currentReports = reportManager.getActiveReports()
+                        android.util.Log.d("MainActivity", "Current local reports: ${currentReports.size}")
+                        currentReports.forEach { report ->
+                            android.util.Log.d("MainActivity", "  Local: ${report.id} - ${report.category.name}")
+                        }
+
+                        android.util.Log.d("MainActivity", "Processing ${reports.size} server reports:")
+                        reports.forEach { serverReport ->
+                            android.util.Log.d("MainActivity", "Processing server report: ${serverReport.id} - ${serverReport.category.name} - ${serverReport.originalText.take(30)}")
+
+                            // Check if we already have this report
+                            val existingReport = reportManager.getActiveReports().find { it.id == serverReport.id }
+                            if (existingReport == null) {
+                                android.util.Log.d("MainActivity", "  ✅ NEW - Adding to local storage and map")
+
+                                reportManager.addReport(serverReport)
+                                newReportsCount++
+
+                                // Add to map with extra logging
+                                if (::mapView.isInitialized && mapView.repository != null) {
+                                    try {
+                                        mapManager.addReportToMap(mapView, serverReport, this@MainActivity)
+                                        android.util.Log.d("MainActivity", "  ✅ Added to map successfully")
+                                    } catch (e: Exception) {
+                                        android.util.Log.e("MainActivity", "  ❌ Failed to add to map: ${e.message}")
+                                    }
+                                } else {
+                                    android.util.Log.e("MainActivity", "  ❌ MapView not ready for report ${serverReport.id}")
+                                }
+                            } else {
+                                android.util.Log.d("MainActivity", "  ⏭️ SKIPPED - Already exists locally")
+                                skippedReportsCount++
+                            }
+                        }
+
+                        android.util.Log.d("MainActivity", "Final counts: new=$newReportsCount, skipped=$skippedReportsCount")
+
+                        if (newReportsCount > 0) {
+                            mapView.post {
+                                mapView.invalidate()
+                                android.util.Log.d("MainActivity", "Map invalidated after adding $newReportsCount reports")
+                            }
+                        }
+
+                        onComplete(true)
+                    } else {
+                        android.util.Log.w("MainActivity", "Silent fetch: no reports or failed: $message")
+                        onComplete(success)
+                    }
+                } catch (e: Exception) {
+                    android.util.Log.e("MainActivity", "Error processing silent fetch: ${e.message}")
+                    onComplete(false)
+                }
+            }
+        }
+    }
+
     private fun createReport(location: GeoPoint, text: String, photo: Bitmap?, category: ReportCategory) {
         val detectedLanguage = translationManager.detectLanguage(text)
         val report = reportManager.createReport(location, text, detectedLanguage, photo, category)
 
         mapManager.addReportToMap(mapView, report, this)
         preferencesManager.setUserHasCreatedReports(true)
+
+        // Convert photo to base64 if present
+        val photoBase64 = if (photo != null) {
+            try {
+                val stream = java.io.ByteArrayOutputStream()
+                val success = photo.compress(android.graphics.Bitmap.CompressFormat.JPEG, 85, stream)
+
+                if (success) {
+                    val byteArray = stream.toByteArray()
+                    stream.close()
+                    val base64String = android.util.Base64.encodeToString(byteArray, android.util.Base64.NO_WRAP)
+                    "data:image/jpeg;base64,$base64String"
+                } else {
+                    null
+                }
+            } catch (e: Exception) {
+                android.util.Log.e("MainActivity", "Error converting photo to base64: ${e.message}")
+                null
+            }
+        } else {
+            null
+        }
+
         backendClient.submitReport(
             latitude = location.latitude,
             longitude = location.longitude,
             content = text,
             language = detectedLanguage,
             hasPhoto = photo != null,
+            photo = photoBase64,
             category = category
         ) { success: Boolean, message: String ->
             runOnUiThread {
-
                 if (success) {
                     subscribeToAlertsForLocation(location.latitude, location.longitude)
                     favoriteManager.checkForFavoriteAlerts()
+
+                    val successMessage = if (preferencesManager.getSavedLanguage() == "es") {
+                        if (photo != null) "Reporte enviado con foto" else "Reporte enviado"
+                    } else {
+                        if (photo != null) "Report sent with photo" else "Report sent"
+                    }
+                    showStatusCard(successMessage, isLoading = false)
+                } else {
+                    val errorMessage = if (preferencesManager.getSavedLanguage() == "es") {
+                        "Error enviando reporte: $message"
+                    } else {
+                        "Error sending report: $message"
+                    }
+                    showStatusCard(errorMessage, isError = true)
                 }
                 Handler(Looper.getMainLooper()).postDelayed({ hideStatusCard() }, 3000)
             }
         }
     }
-
 
     private fun setupViews() {
         mapView = findViewById(R.id.mapView)
@@ -194,63 +412,22 @@ class MainActivity : AppCompatActivity(),
         searchBar = findViewById(R.id.search_bar)
         btnSearch = findViewById(R.id.btn_search)
         btnClearSearch = findViewById(R.id.btn_clear_search)
-        instructionOverlay = findViewById(R.id.instruction_overlay)  // NEW: Get instruction overlay reference
+        instructionOverlay = findViewById(R.id.instruction_overlay)
     }
 
-    private fun setupManagers() {
-        preferencesManager = PreferencesManager(this)
-        reportManager = ReportManager(preferencesManager)
-        locationManager = LocationManager(this)
-        mapManager = MapManager(this)
-        alertManager = AlertManager(preferencesManager, reportManager, locationManager)
-        photoManager = PhotoManager(this, preferencesManager)
-        backendClient = BackendClient()
-        favoriteManager = FavoriteManager(preferencesManager, reportManager, locationManager, backendClient)
-        dialogManager = DialogManager(this, preferencesManager)
-        translationManager = TranslationManager(this)
-
-        // Set listeners
-        alertManager.setAlertListener(this)
-
-        // CRITICAL: Ensure favorite listener is set up with logging
-        android.util.Log.d("MainActivity", "Setting up FavoriteListener")
-        favoriteManager.setFavoriteListener(this)
-        android.util.Log.d("MainActivity", "FavoriteListener set up successfully")
-    }
-
-
-    // Also update the onFavoritesUpdated method with additional debugging:
     override fun onFavoritesUpdated(favorites: List<FavoritePlace>) {
-        android.util.Log.d("MainActivity", "=== onFavoritesUpdated CALLED ===")
-        android.util.Log.d("MainActivity", "Thread: ${Thread.currentThread().name}")
-        android.util.Log.d("MainActivity", "Received ${favorites.size} favorites")
-
-        // Log each favorite received
-        favorites.forEachIndexed { index, favorite ->
-            android.util.Log.d("MainActivity", "Favorite $index: ${favorite.name} (ID: ${favorite.id})")
-        }
-
         runOnUiThread {
             try {
-                // Clear ALL existing favorite markers first
-                android.util.Log.d("MainActivity", "Clearing all favorite markers from map")
+                android.util.Log.d("MainActivity", "onFavoritesUpdated: ${favorites.size} favorites")
                 mapManager.clearFavoriteMarkers(mapView)
 
-                // Add all current favorites back to map
-                android.util.Log.d("MainActivity", "Adding ${favorites.size} favorites back to map")
                 favorites.forEach { favorite ->
-                    android.util.Log.d("MainActivity", "Adding favorite to map: ${favorite.name}")
                     mapManager.addFavoriteToMap(mapView, favorite, this)
                 }
 
-                // Force map refresh
                 mapView.post {
                     mapView.invalidate()
-                    android.util.Log.d("MainActivity", "Map invalidated and refreshed")
                 }
-
-                android.util.Log.d("MainActivity", "=== onFavoritesUpdated COMPLETED ===")
-
             } catch (e: Exception) {
                 android.util.Log.e("MainActivity", "Error updating favorites on map: ${e.message}")
             }
@@ -260,55 +437,47 @@ class MainActivity : AppCompatActivity(),
     private fun setupInstructionOverlay() {
         val btnUserGuideLink = findViewById<TextView>(R.id.btn_user_guide_link)
 
-        // Check if user has created reports before
         val hasCreatedReports = reportManager.getActiveReports().isNotEmpty() ||
                 preferencesManager.hasUserCreatedReports()
 
-        // Check if this is a language change
         val isLanguageChange = preferencesManager.isLanguageChange()
 
         if (hasCreatedReports && !isLanguageChange) {
-            // Hide immediately if user has used the app before AND it's not a language change
             instructionOverlay.visibility = View.GONE
             hasUserInteracted = true
         } else {
-            // Show instruction overlay for new users OR language changes
             instructionOverlay.visibility = View.VISIBLE
             hasUserInteracted = false
 
-            // Make it clickable to dismiss
             instructionOverlay.setOnClickListener {
                 hideInstructionOverlay()
             }
 
-            // Set up User Guide link
             btnUserGuideLink.setOnClickListener {
                 hideInstructionOverlay()
                 dialogManager.showUserGuideDialog()
             }
 
-            // If it was a language change, clear the flag
             if (isLanguageChange) {
                 preferencesManager.setLanguageChange(false)
             }
         }
     }
-    // NEW: Schedule auto-hide of instruction overlay
+
     private fun scheduleInstructionOverlayAutoHide() {
         if (!hasUserInteracted && instructionOverlay.visibility == View.VISIBLE) {
             Handler(Looper.getMainLooper()).postDelayed({
                 if (!hasUserInteracted && instructionOverlay.visibility == View.VISIBLE) {
                     hideInstructionOverlay()
                 }
-            }, 8000) // Hide after 8 seconds
+            }, 8000)
         }
     }
 
-    // NEW: Hide instruction overlay with animation
     private fun hideInstructionOverlay() {
         if (instructionOverlay.visibility == View.VISIBLE) {
             hasUserInteracted = true
-            preferencesManager.setUserHasCreatedReports(true)  // Remember user has interacted
+            preferencesManager.setUserHasCreatedReports(true)
 
             ObjectAnimator.ofFloat(instructionOverlay, "alpha", 1f, 0f).apply {
                 duration = 500
@@ -340,7 +509,6 @@ class MainActivity : AppCompatActivity(),
 
         Handler(Looper.getMainLooper()).postDelayed({
             try {
-                // ADD SAFETY CHECK
                 if (::mapView.isInitialized && mapView.repository != null) {
                     reportManager.getActiveReports().forEach { report ->
                         mapManager.addReportToMap(mapView, report, this)
@@ -349,54 +517,59 @@ class MainActivity : AppCompatActivity(),
                     favoriteManager.getFavorites().forEach { favorite ->
                         mapManager.addFavoriteToMap(mapView, favorite, this)
                     }
-                } else {
-                    android.util.Log.w("MainActivity", "MapView not ready, skipping initial load")
                 }
             } catch (e: Exception) {
                 android.util.Log.e("MainActivity", "Error loading existing items on map: ${e.message}")
             }
-        }, 3000) // Increase delay from 2000 to 3000
+        }, 3000)
     }
 
     private fun setupBottomNavigation() {
         btnLanguageToggle.setOnClickListener {
             animateButtonPress(btnLanguageToggle)
             toggleLanguage()
-            hideInstructionOverlay()  // NEW: Hide on any interaction
+            hideInstructionOverlay()
         }
 
         btnSettings.setOnClickListener {
             animateButtonPress(btnSettings)
             dialogManager.showSettingsDialog(backendClient)
-            hideInstructionOverlay()  // NEW: Hide on any interaction
+            hideInstructionOverlay()
         }
 
         btnAlerts.setOnClickListener {
             animateButtonPress(btnAlerts)
             openAlertsScreen()
-            hideInstructionOverlay()  // NEW: Hide on any interaction
+            hideInstructionOverlay()
         }
 
         btnFavorites.setOnClickListener {
             animateButtonPress(btnFavorites)
             openFavoritesScreen()
-            hideInstructionOverlay()  // NEW: Hide on any interaction
+            hideInstructionOverlay()
         }
     }
 
-    // LocationManager.LocationListener Implementation
     override fun onLocationUpdate(location: Location) {
         val userLocation = GeoPoint(location.latitude, location.longitude)
         mapManager.addLocationMarker(mapView, userLocation)
+
         alertManager.checkForNewAlerts(location)
         favoriteManager.checkForFavoriteAlerts()
+
         subscribeToAlertsForLocation(location.latitude, location.longitude)
     }
 
     override fun onLocationError(error: String) {
         android.util.Log.e("PinLocal", "Location error: $error")
     }
+
     override fun onNewAlerts(alerts: List<Alert>) {
+        android.util.Log.d("MainActivity", "🚨 NEW ALERTS DETECTED: ${alerts.size} alerts")
+        alerts.forEach { alert ->
+            android.util.Log.d("MainActivity", "  - Alert: ${alert.report.category} - ${alert.report.originalText.take(30)}")
+        }
+
         val message = alertManager.getAlertSummaryMessage(
             alerts,
             preferencesManager.getSavedLanguage() == "es"
@@ -406,22 +579,18 @@ class MainActivity : AppCompatActivity(),
         val isSpanish = preferencesManager.getSavedLanguage() == "es"
         val title = if (isSpanish) "Nueva Alerta" else "New Alert"
 
-        // Check if any alert is a safety alert
         val hasSafetyAlert = alerts.any { it.report.category == ReportCategory.SAFETY }
         val category = if (hasSafetyAlert) "SAFETY" else alerts.first().report.category.code.uppercase()
 
         if (hasSafetyAlert) {
-            // Safety alerts check the alarm override setting
             alarmManager.triggerAlert(title, message, category)
-            android.util.Log.d("MainActivity", "Safety alert - checking alarm override setting")
         } else {
-            // Fun/Lost alerts ALWAYS use silent notification (ignore override setting)
             alarmManager.triggerSilentNotification(title, message, category)
-            android.util.Log.d("MainActivity", "Non-safety alert - using silent notification only")
         }
 
         Handler(Looper.getMainLooper()).postDelayed({ hideStatusCard() }, 3000)
     }
+
     override fun onAlertsUpdated(hasUnviewed: Boolean) {
         updateAlertsButtonColor(hasUnviewed)
     }
@@ -437,29 +606,24 @@ class MainActivity : AppCompatActivity(),
         )
         showStatusCard(message, isLoading = false)
 
-        // Check for Safety alerts in favorites and trigger alarm
         val isSpanish = preferencesManager.getSavedLanguage() == "es"
         val title = if (isSpanish) "Alerta en Favorito" else "Alert at Favorite"
 
-        // Check if any favorite alert is a safety alert
         val hasSafetyAlert = alerts.any { it.report.category == ReportCategory.SAFETY }
         val category = if (hasSafetyAlert) "SAFETY" else alerts.first().report.category.code.uppercase()
 
         if (hasSafetyAlert) {
-            // Safety alerts at favorites check the alarm override setting
             alarmManager.triggerAlert(title, message, category)
-            android.util.Log.d("MainActivity", "Safety alert at favorite - checking alarm override setting")
         } else {
-            // Fun/Lost alerts at favorites ALWAYS use silent notification
             alarmManager.triggerSilentNotification(title, message, category)
-            android.util.Log.d("MainActivity", "Non-safety alert at favorite - using silent notification only")
         }
 
         Handler(Looper.getMainLooper()).postDelayed({ hideStatusCard() }, 3000)
     }
+
     // MapManager.MapInteractionListener Implementation
     override fun onLongPress(location: GeoPoint) {
-        hideInstructionOverlay()  // NEW: Hide on map interaction
+        hideInstructionOverlay()
         showMapLongPressOptions(location)
     }
 
@@ -514,8 +678,17 @@ class MainActivity : AppCompatActivity(),
             onCategoryChange = { category: ReportCategory ->
                 selectedCategory = category
             },
-            onPhotoRequest = {
-                photoManager.showPhotoSelectionDialog(this)
+            onPhotoRequest = { onPhotoSelected ->
+                val photoCallback = object : PhotoManager.PhotoCallback {
+                    override fun onPhotoSelected(bitmap: Bitmap) {
+                        onPhotoSelected(bitmap)
+                    }
+
+                    override fun onPhotoError(message: String) {
+                        showStatusCard(message, isError = true)
+                    }
+                }
+                photoManager.showPhotoSelectionDialog(photoCallback)
             },
             onSubmit = { reportLocation: GeoPoint, text: String, photo: Bitmap?, category: ReportCategory ->
                 createReport(reportLocation, text, photo, category)
@@ -533,9 +706,45 @@ class MainActivity : AppCompatActivity(),
     }
 
     private fun updateFavoritesButtonColor(hasUnviewedAlerts: Boolean) {
-        // Always use the default bottom nav icon color (no red)
         val tintColor = ContextCompat.getColor(this, R.color.bottom_nav_icon)
         btnFavorites.imageTintList = android.content.res.ColorStateList.valueOf(tintColor)
+    }
+
+    private fun startPeriodicReportSync() {
+        syncHandler = Handler(Looper.getMainLooper())
+        syncRunnable = object : Runnable {
+            override fun run() {
+                try {
+                    // Only sync if app is in foreground
+                    if (isAppInForeground && ::mapView.isInitialized && mapView.repository != null) {
+                        fetchReportsFromServerSilently { success ->
+                            android.util.Log.d("MainActivity", "Foreground sync completed: $success")
+                        }
+                    }
+
+                    // Schedule next sync only if still in foreground
+                    if (isAppInForeground) {
+                        syncHandler?.postDelayed(this, 30000)
+                    }
+                } catch (e: Exception) {
+                    android.util.Log.e("MainActivity", "Error in periodic sync: ${e.message}")
+                    if (isAppInForeground) {
+                        syncHandler?.postDelayed(this, 30000)
+                    }
+                }
+            }
+        }
+
+        // Start first sync after 10 seconds
+        syncHandler?.postDelayed(syncRunnable!!, 10000)
+    }
+
+    private fun stopPeriodicReportSync() {
+        syncRunnable?.let { runnable ->
+            syncHandler?.removeCallbacks(runnable)
+        }
+        syncHandler = null
+        syncRunnable = null
     }
 
     private fun startTimers() {
@@ -556,12 +765,24 @@ class MainActivity : AppCompatActivity(),
         }
         Handler(Looper.getMainLooper()).postDelayed(cleanupRunnable, 60 * 60 * 1000)
 
+        // Alert checking with server fetching - FIXED
         val alertCheckRunnable = object : Runnable {
             override fun run() {
-                locationManager.getCurrentLocation()?.let { location ->
-                    alertManager.checkForNewAlerts(location)
-                    favoriteManager.checkForFavoriteAlerts()
+                try {
+                    val currentLocation = locationManager.getCurrentLocation()
+                    if (currentLocation != null) {
+                        // Fetch new reports from server (no location parameter needed)
+                        fetchReportsFromServerSilently { success ->
+                            // Then check for alerts using the current location
+                            alertManager.checkForNewAlerts(currentLocation)
+                            favoriteManager.checkForFavoriteAlerts()
+                        }
+                    }
+                } catch (e: Exception) {
+                    android.util.Log.e("MainActivity", "Error in periodic alert check: ${e.message}")
                 }
+
+                // Schedule next check in 2 minutes
                 Handler(Looper.getMainLooper()).postDelayed(this, 2 * 60 * 1000)
             }
         }
@@ -570,7 +791,7 @@ class MainActivity : AppCompatActivity(),
 
     private fun setupLocationButton() {
         fabLocation.backgroundTintList = android.content.res.ColorStateList.valueOf(
-            Color.parseColor("#8E8E93") // iOS gray color
+            Color.parseColor("#8E8E93")
         )
 
         fabLocation.imageTintList = android.content.res.ColorStateList.valueOf(Color.WHITE)
@@ -590,7 +811,7 @@ class MainActivity : AppCompatActivity(),
         btnSearch.setOnClickListener {
             animateButtonPress(btnSearch)
             performSearch()
-            hideInstructionOverlay()  // NEW: Hide on search
+            hideInstructionOverlay()
         }
 
         btnClearSearch.setOnClickListener {
@@ -601,7 +822,7 @@ class MainActivity : AppCompatActivity(),
         searchBar.setOnEditorActionListener { _, actionId, _ ->
             if (actionId == EditorInfo.IME_ACTION_SEARCH) {
                 performSearch()
-                hideInstructionOverlay()  // NEW: Hide on search
+                hideInstructionOverlay()
                 true
             } else false
         }
@@ -612,7 +833,7 @@ class MainActivity : AppCompatActivity(),
             override fun afterTextChanged(s: android.text.Editable?) {
                 btnClearSearch.visibility = if (s.isNullOrEmpty()) View.GONE else View.VISIBLE
                 if (!s.isNullOrEmpty()) {
-                    hideInstructionOverlay()  // NEW: Hide when user starts typing
+                    hideInstructionOverlay()
                 }
             }
         })
@@ -678,9 +899,7 @@ class MainActivity : AppCompatActivity(),
                 mapManager.addLocationMarker(mapView, userLocation)
 
                 val locationText = locationManager.getLocationDescription(location)
-                val message = if (preferencesManager.getSavedLanguage() == "es")
-                    "$locationText" else "$locationText"
-                showStatusCard(message, isLoading = false)
+                showStatusCard(locationText, isLoading = false)
                 Handler(Looper.getMainLooper()).postDelayed({ hideStatusCard() }, 5000)
             } else {
                 val message = if (preferencesManager.getSavedLanguage() == "es")
@@ -707,7 +926,6 @@ class MainActivity : AppCompatActivity(),
         val isLanguageChange = preferencesManager.isLanguageChange()
 
         if (locationManager.hasLocationPermission()) {
-            // Permission already granted - get location immediately
             if (!isLanguageChange) {
                 val message = if (preferencesManager.getSavedLanguage() == "es")
                     "Encontrando tu ubicación..." else "Finding your location..."
@@ -715,19 +933,16 @@ class MainActivity : AppCompatActivity(),
             }
             getCurrentLocationSilently(isStartup = true)
         } else {
-            // No permission - auto-request it
             val message = if (preferencesManager.getSavedLanguage() == "es")
                 "Solicitando permiso de ubicación..." else "Requesting location permission..."
             showStatusCard(message, isLoading = true)
             requestLocationPermission()
         }
 
-        // Clear language change flag if it was set
         if (isLanguageChange) {
             preferencesManager.setLanguageChange(false)
         }
 
-        // Schedule alert checking after location is obtained
         Handler(Looper.getMainLooper()).postDelayed({
             locationManager.getCurrentLocation()?.let { location ->
                 alertManager.checkForNewAlerts(location)
@@ -748,6 +963,12 @@ class MainActivity : AppCompatActivity(),
                     hideStatusCard()
                     alertManager.checkForNewAlerts(location)
                     subscribeToAlertsForLocation(location.latitude, location.longitude)
+
+                    Handler(Looper.getMainLooper()).postDelayed({
+                        mapView.invalidate()
+                        mapView.requestLayout()
+                    }, 500)
+
                 } else {
                     mapView.controller.animateTo(userLocation, 18.0, 1000L)
                     mapManager.addLocationMarker(mapView, userLocation)
@@ -792,7 +1013,7 @@ class MainActivity : AppCompatActivity(),
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
             ActivityCompat.requestPermissions(
                 this,
-                arrayOf(Manifest.permission.ACCESS_COARSE_LOCATION), // Only coarse location
+                arrayOf(Manifest.permission.ACCESS_COARSE_LOCATION),
                 LOCATION_PERMISSION_REQUEST
             )
         } else {
@@ -872,7 +1093,6 @@ class MainActivity : AppCompatActivity(),
         when (requestCode) {
             LOCATION_PERMISSION_REQUEST -> {
                 if (grantResults.isNotEmpty() && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
-                    // Permission granted - immediately get location
                     val message = if (preferencesManager.getSavedLanguage() == "es")
                         "Encontrando tu ubicación..." else "Finding your location..."
                     showStatusCard(message, isLoading = true)
@@ -899,87 +1119,82 @@ class MainActivity : AppCompatActivity(),
         }
     }
 
-    override fun onPause() {
-        super.onPause()
-        try {
-            mapView.onPause()
-            System.gc()
-        } catch (e: Exception) {
-            android.util.Log.e("PinLocal", "Error in onPause: ${e.message}")
-        }
-    }
-
-
     override fun onResume() {
         super.onResume()
         try {
             mapView.onResume()
+            isAppInForeground = true
 
-            // CRITICAL: Add delay to refresh favorites when returning to MainActivity
-            // This ensures any deletion operations are fully complete before refreshing
-            android.util.Log.d("MainActivity", "onResume - scheduling favorites refresh")
+            // Debug what's currently on the map
+            debugMapContents()
+
+            // Sync once when returning to foreground
             Handler(Looper.getMainLooper()).postDelayed({
-                android.util.Log.d("MainActivity", "onResume - refreshing favorites on map")
-                refreshFavoritesOnMap()
-            }, 200) // Small delay to ensure deletion is complete
+                fetchReportsFromServerSilently { success ->
+                    android.util.Log.d("MainActivity", "Resume sync completed: $success")
+                    // Debug again after sync
+                    debugMapContents()
+                }
+            }, 1000)
+
+            // Restart periodic sync
+            if (syncRunnable == null) {
+                startPeriodicReportSync()
+            }
+
+            // Existing favorites refresh code...
+            refreshFavoritesOnMap()
 
         } catch (e: Exception) {
             android.util.Log.e("MainActivity", "Error in onResume: ${e.message}")
         }
     }
 
+    override fun onPause() {
+        super.onPause()
+        try {
+            mapView.onPause()
+            isAppInForeground = false
+            stopPeriodicReportSync() // Stop battery-draining sync
+            System.gc()
+        } catch (e: Exception) {
+            android.util.Log.e("PinLocal", "Error in onPause: ${e.message}")
+        }
+    }
+
     private fun refreshFavoritesOnMap() {
         try {
-            android.util.Log.d("MainActivity", "=== REFRESHING FAVORITES ON MAP ===")
-
-            // CRITICAL FIX: Reload favorites from preferences first
             favoriteManager.loadSavedData()
 
-            // Get current favorites from manager
             val currentFavorites = favoriteManager.getFavorites()
-            android.util.Log.d("MainActivity", "Current favorites count: ${currentFavorites.size}")
-
-            // Clear all existing favorite markers
             mapManager.clearFavoriteMarkers(mapView)
 
-            // Add all current favorites back to map
             currentFavorites.forEach { favorite ->
-                android.util.Log.d("MainActivity", "Adding favorite to map: ${favorite.name}")
                 mapManager.addFavoriteToMap(mapView, favorite, this)
             }
 
-            // Force map refresh
             mapView.invalidate()
-
-            android.util.Log.d("MainActivity", "=== REFRESH FAVORITES COMPLETED ===")
-
         } catch (e: Exception) {
             android.util.Log.e("MainActivity", "Error refreshing favorites on map: ${e.message}")
         }
     }
+
     companion object {
         private const val FAVORITES_ACTIVITY_REQUEST = 1001
     }
 
-    // Update the openFavoritesScreen method in MainActivity.kt:
     private fun openFavoritesScreen() {
         val intent = Intent(this, FavoritesActivity::class.java)
         startActivityForResult(intent, FAVORITES_ACTIVITY_REQUEST)
     }
 
-    // Add this method to MainActivity.kt:
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         super.onActivityResult(requestCode, resultCode, data)
 
         when (requestCode) {
             FAVORITES_ACTIVITY_REQUEST -> {
                 if (resultCode == RESULT_OK) {
-                    android.util.Log.d("MainActivity", "Returned from FavoritesActivity - favorites may have changed")
-
-                    // Force refresh favorites on map
                     refreshFavoritesOnMap()
-
-                    // Also re-register the listener in case it was cleared
                     favoriteManager.setFavoriteListener(this)
                 }
             }
