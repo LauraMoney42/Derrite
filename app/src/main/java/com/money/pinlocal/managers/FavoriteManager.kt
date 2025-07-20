@@ -166,12 +166,24 @@ class FavoriteManager(
 
     // Check for new alerts near favorite places
     fun checkForFavoriteAlerts() {
+        android.util.Log.d("FavoriteManager", "=== CHECKING FOR FAVORITE ALERTS ===")
+
+        // PRIVACY-SAFE: Simple time-based check - don't process alerts if we recently created a report
+        if (reportManager.shouldSkipAlertsCheck()) {
+            android.util.Log.d("FavoriteManager", "⏰ Skipping favorite alert check - recent report created")
+            return
+        }
+
         val newAlerts = mutableListOf<FavoriteAlert>()
 
         for (favorite in favoritePlaces) {
+            android.util.Log.d("FavoriteManager", "Checking favorite: ${favorite.name}")
+
             for (report in reportManager.getActiveReports()) {
                 // Skip if this favorite doesn't want alerts for this category
-                if (!favorite.shouldAlertForCategory(report.category)) continue
+                if (!favorite.shouldAlertForCategory(report.category)) {
+                    continue
+                }
 
                 val distance = locationManager.calculateDistance(
                     favorite.location.latitude, favorite.location.longitude,
@@ -185,6 +197,8 @@ class FavoriteManager(
                     }
 
                     if (existingAlert == null) {
+                        android.util.Log.d("FavoriteManager", "✅ Creating favorite alert for report: ${report.id} at ${favorite.name}")
+
                         val alert = FavoriteAlert(
                             favoritePlace = favorite,
                             report = report,
@@ -198,12 +212,15 @@ class FavoriteManager(
             }
         }
 
+        android.util.Log.d("FavoriteManager", "New favorite alerts created: ${newAlerts.size}")
+
         if (newAlerts.isNotEmpty()) {
             val unviewedNewAlerts = newAlerts.filter {
                 !it.isViewed && !viewedFavoriteAlertIds.contains(it.report.id + it.favoritePlace.id)
             }
 
             if (unviewedNewAlerts.isNotEmpty()) {
+                android.util.Log.d("FavoriteManager", "🔔 Triggering ${unviewedNewAlerts.size} favorite alerts")
                 favoriteListener?.onNewFavoriteAlerts(unviewedNewAlerts)
             }
         }
@@ -212,8 +229,9 @@ class FavoriteManager(
             !viewedFavoriteAlertIds.contains(it.report.id + it.favoritePlace.id)
         }
         favoriteListener?.onFavoriteAlertsUpdated(favoriteAlerts.toList(), hasUnviewed)
-    }
 
+        android.util.Log.d("FavoriteManager", "=== END FAVORITE ALERT CHECK ===")
+    }
     // Get favorite alerts
     fun getFavoriteAlerts(favoriteId: String): List<FavoriteAlert> {
         return favoriteAlerts.filter { it.favoritePlace.id == favoriteId }

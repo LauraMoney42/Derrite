@@ -1,4 +1,4 @@
-// File: BackendClient.kt (Fixed with fetchReports method)
+// File: BackendClient.kt (Enhanced with Rate Limiting & Retry Logic)
 package com.money.pinlocal
 
 import okhttp3.*
@@ -13,16 +13,217 @@ import com.money.pinlocal.data.ReportCategory
 import com.money.pinlocal.data.Report
 import org.osmdroid.util.GeoPoint
 import java.util.UUID
+import android.os.Handler
+import android.os.Looper
+import java.util.concurrent.ConcurrentLinkedQueue
+import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.AtomicLong
 
 class BackendClient {
     companion object {
         private const val BACKEND_URL = "https://backend-production-cfbe.up.railway.app"
+        private const val MAX_REQUESTS_PER_MINUTE = 10
+        private const val RATE_LIMIT_WINDOW_MS = 60000L // 1 minute
+        private const val MAX_RETRIES = 3
+        private const val INITIAL_RETRY_DELAY_MS = 1000L
     }
 
     private val client = OkHttpClient.Builder()
         .connectTimeout(30, TimeUnit.SECONDS)
         .readTimeout(30, TimeUnit.SECONDS)
+        .writeTimeout(30, TimeUnit.SECONDS)
         .build()
+
+    // Rate limiting
+    private val requestTimes = ConcurrentLinkedQueue<Long>()
+    private val isProcessingQueue = AtomicBoolean(false)
+    private val lastRequestTime = AtomicLong(0)
+    private val requestQueue = ConcurrentLinkedQueue<QueuedRequest>()
+
+    data class QueuedRequest(
+        val request: Request,
+        val callback: (Boolean, String) -> Unit,
+        val retryCount: Int = 0,
+        val requestType: String = "generic"
+    )
+
+    // Rate limiting check
+    private fun canMakeRequest(): Boolean {
+        val now = System.currentTimeMillis()
+
+        // Remove old requests outside the window
+        while (requestTimes.isNotEmpty() && (now - requestTimes.peek()) > RATE_LIMIT_WINDOW_MS) {
+            requestTimes.poll()
+        }
+
+        // Check if we're under the limit
+        if (requestTimes.size >= MAX_REQUESTS_PER_MINUTE) {
+            android.util.Log.w("BackendClient", "🚫 Rate limit reached: ${requestTimes.size}/$MAX_REQUESTS_PER_MINUTE requests in last minute")
+            return false
+        }
+
+        // Add minimum delay between requests (2 seconds)
+        val timeSinceLastRequest = now - lastRequestTime.get()
+        if (timeSinceLastRequest < 2000) {
+            android.util.Log.w("BackendClient", "⏱️ Too frequent requests, need to wait ${2000 - timeSinceLastRequest}ms")
+            return false
+        }
+
+        return true
+    }
+
+    private fun recordRequest() {
+        val now = System.currentTimeMillis()
+        requestTimes.offer(now)
+        lastRequestTime.set(now)
+    }
+
+    private fun processRequestQueue() {
+        if (!isProcessingQueue.compareAndSet(false, true)) {
+            return // Already processing
+        }
+
+        fun processNext() {
+            val queuedRequest = requestQueue.poll()
+            if (queuedRequest == null) {
+                isProcessingQueue.set(false)
+                return
+            }
+
+            if (canMakeRequest()) {
+                recordRequest()
+                executeRequest(queuedRequest) {
+                    // Continue processing queue after delay
+                    Handler(Looper.getMainLooper()).postDelayed({
+                        processNext()
+                    }, 2000) // 2 second delay between requests
+                }
+            } else {
+                // Can't make request now, wait and try again
+                requestQueue.offer(queuedRequest) // Put it back at the front
+                Handler(Looper.getMainLooper()).postDelayed({
+                    processNext()
+                }, 5000) // Wait 5 seconds before retry
+            }
+        }
+
+        processNext()
+    }
+
+    private fun executeRequest(queuedRequest: QueuedRequest, onComplete: () -> Unit) {
+        android.util.Log.d("BackendClient", "📡 Executing ${queuedRequest.requestType} request (attempt ${queuedRequest.retryCount + 1})")
+
+        client.newCall(queuedRequest.request).enqueue(object : Callback {
+            override fun onFailure(call: Call, e: IOException) {
+                android.util.Log.e("BackendClient", "❌ Network error for ${queuedRequest.requestType}: ${e.message}")
+                handleRequestFailure(queuedRequest, "Network error: ${e.message}", onComplete)
+            }
+
+            override fun onResponse(call: Call, response: Response) {
+                response.use {
+                    when (response.code) {
+                        200, 201 -> {
+                            // Success
+                            handleSuccessResponse(queuedRequest, response, onComplete)
+                        }
+                        429 -> {
+                            // Rate limited
+                            android.util.Log.w("BackendClient", "⚠️ Rate limited (429) for ${queuedRequest.requestType}")
+                            handleRateLimit(queuedRequest, onComplete)
+                        }
+                        in 500..599 -> {
+                            // Server error - retry
+                            android.util.Log.w("BackendClient", "⚠️ Server error ${response.code} for ${queuedRequest.requestType}")
+                            handleRetryableError(queuedRequest, "Server error: ${response.code}", onComplete)
+                        }
+                        else -> {
+                            // Client error - don't retry
+                            android.util.Log.e("BackendClient", "❌ Client error ${response.code} for ${queuedRequest.requestType}")
+                            queuedRequest.callback(false, "Server error: ${response.code}")
+                            onComplete()
+                        }
+                    }
+                }
+            }
+        })
+    }
+
+    private fun handleSuccessResponse(queuedRequest: QueuedRequest, response: Response, onComplete: () -> Unit) {
+        try {
+            val responseBody = response.body?.string() ?: "{}"
+
+            when (queuedRequest.requestType) {
+                "submitReport" -> {
+                    val jsonResponse = JSONObject(responseBody)
+                    val success = jsonResponse.optBoolean("success", false)
+                    val zone = jsonResponse.optString("zone", "unknown")
+                    val message = if (success) "Report submitted to zone: $zone" else "Server rejected report"
+                    queuedRequest.callback(success, message)
+                }
+                "fetchReports" -> {
+                    val reports = parseReportsFromJson(responseBody)
+                    (queuedRequest.callback as (Boolean, List<Report>, String) -> Unit)(true, reports, "Success")
+                }
+                else -> {
+                    queuedRequest.callback(true, responseBody)
+                }
+            }
+        } catch (e: Exception) {
+            android.util.Log.e("BackendClient", "❌ Error parsing response for ${queuedRequest.requestType}: ${e.message}")
+            queuedRequest.callback(false, "Invalid server response")
+        }
+        onComplete()
+    }
+
+    private fun handleRequestFailure(queuedRequest: QueuedRequest, errorMessage: String, onComplete: () -> Unit) {
+        if (queuedRequest.retryCount < MAX_RETRIES) {
+            // Retry with exponential backoff
+            val retryDelay = INITIAL_RETRY_DELAY_MS * (1L shl queuedRequest.retryCount) // 2^retryCount
+            android.util.Log.i("BackendClient", "🔄 Retrying ${queuedRequest.requestType} in ${retryDelay}ms (attempt ${queuedRequest.retryCount + 1}/$MAX_RETRIES)")
+
+            Handler(Looper.getMainLooper()).postDelayed({
+                val retryRequest = queuedRequest.copy(retryCount = queuedRequest.retryCount + 1)
+                requestQueue.offer(retryRequest)
+                onComplete()
+            }, retryDelay)
+        } else {
+            android.util.Log.e("BackendClient", "❌ Max retries exceeded for ${queuedRequest.requestType}")
+            queuedRequest.callback(false, errorMessage)
+            onComplete()
+        }
+    }
+
+    private fun handleRateLimit(queuedRequest: QueuedRequest, onComplete: () -> Unit) {
+        // For rate limits, wait longer before retry
+        val retryDelay = 10000L + (queuedRequest.retryCount * 5000L) // 10s, 15s, 20s...
+        android.util.Log.i("BackendClient", "⏱️ Rate limited, retrying ${queuedRequest.requestType} in ${retryDelay}ms")
+
+        Handler(Looper.getMainLooper()).postDelayed({
+            val retryRequest = queuedRequest.copy(retryCount = queuedRequest.retryCount + 1)
+            if (retryRequest.retryCount <= MAX_RETRIES) {
+                requestQueue.offer(retryRequest)
+            } else {
+                queuedRequest.callback(false, "Rate limit exceeded - please try again later")
+            }
+            onComplete()
+        }, retryDelay)
+    }
+
+    private fun handleRetryableError(queuedRequest: QueuedRequest, errorMessage: String, onComplete: () -> Unit) {
+        if (queuedRequest.retryCount < MAX_RETRIES) {
+            val retryDelay = INITIAL_RETRY_DELAY_MS * (1L shl queuedRequest.retryCount)
+            android.util.Log.i("BackendClient", "🔄 Server error, retrying ${queuedRequest.requestType} in ${retryDelay}ms")
+
+            Handler(Looper.getMainLooper()).postDelayed({
+                val retryRequest = queuedRequest.copy(retryCount = queuedRequest.retryCount + 1)
+                requestQueue.offer(retryRequest)
+                onComplete()
+            }, retryDelay)
+        } else {
+            queuedRequest.callback(false, errorMessage)
+        }
+        onComplete()
+    }
 
     fun testConnection(callback: (Boolean, String) -> Unit) {
         val request = Request.Builder()
@@ -30,22 +231,9 @@ class BackendClient {
             .get()
             .build()
 
-        client.newCall(request).enqueue(object : Callback {
-            override fun onFailure(call: Call, e: IOException) {
-                callback(false, "Cannot connect: ${e.message}")
-            }
-
-            override fun onResponse(call: Call, response: Response) {
-                response.use {
-                    if (response.isSuccessful) {
-                        val body = response.body?.string() ?: "No response body"
-                        callback(true, "Connected! Response: $body")
-                    } else {
-                        callback(false, "Server error: ${response.code}")
-                    }
-                }
-            }
-        })
+        val queuedRequest = QueuedRequest(request, callback, 0, "testConnection")
+        requestQueue.offer(queuedRequest)
+        processRequestQueue()
     }
 
     fun submitReport(
@@ -54,11 +242,13 @@ class BackendClient {
         content: String,
         language: String,
         hasPhoto: Boolean,
-        photo: String? = null,  // ADD THIS PARAMETER
+        photo: String? = null,
         category: ReportCategory,
         callback: (Boolean, String) -> Unit
     ) {
         try {
+            android.util.Log.d("BackendClient", "📝 Queuing report submission: ${category.displayName}")
+
             val json = JSONObject().apply {
                 put("lat", latitude)
                 put("lng", longitude)
@@ -67,11 +257,9 @@ class BackendClient {
                 put("hasPhoto", hasPhoto)
                 put("category", category.code)
                 if (hasPhoto && photo != null) {
-                    put("photo", photo)  // ADD THIS LINE
+                    put("photo", photo)
                 }
             }
-
-            android.util.Log.d("BackendClient", "Submitting report with photo: $hasPhoto, photo data length: ${photo?.length ?: 0}")
 
             val mediaType = "application/json; charset=utf-8".toMediaType()
             val requestBody = json.toString().toRequestBody(mediaType)
@@ -81,107 +269,84 @@ class BackendClient {
                 .post(requestBody)
                 .build()
 
-            client.newCall(request).enqueue(object : Callback {
-                override fun onFailure(call: Call, e: IOException) {
-                    callback(false, "Network error: ${e.message}")
-                }
+            val queuedRequest = QueuedRequest(request, callback, 0, "submitReport")
+            requestQueue.offer(queuedRequest)
+            processRequestQueue()
 
-                override fun onResponse(call: Call, response: Response) {
-                    response.use {
-                        if (response.isSuccessful) {
-                            val responseBody = response.body?.string() ?: "{}"
-                            try {
-                                val jsonResponse = JSONObject(responseBody)
-                                val success = jsonResponse.optBoolean("success", false)
-                                val zone = jsonResponse.optString("zone", "unknown")
-
-                                if (success) {
-                                    callback(true, "Report submitted to zone: $zone")
-                                } else {
-                                    callback(false, "Server rejected report")
-                                }
-                            } catch (e: Exception) {
-                                callback(false, "Invalid server response")
-                            }
-                        } else {
-                            callback(false, "Server error: ${response.code}")
-                        }
-                    }
-                }
-            })
         } catch (e: Exception) {
+            android.util.Log.e("BackendClient", "❌ Error creating report request: ${e.message}")
             callback(false, "Request creation failed: ${e.message}")
         }
     }
 
-    //  Fetch ALL reports globally
     fun fetchAllReports(callback: (Boolean, List<Report>, String) -> Unit) {
         try {
-            android.util.Log.d("BackendClient", "🌍 Fetching ALL reports globally")
+            android.util.Log.d("BackendClient", "🌍 Queuing fetch all reports request")
 
             val request = Request.Builder()
                 .url("$BACKEND_URL/reports/all")
                 .get()
                 .build()
 
-            client.newCall(request).enqueue(object : Callback {
-                override fun onFailure(call: Call, e: IOException) {
-                    android.util.Log.e("BackendClient", "❌ Network error fetching all reports: ${e.message}")
-                    callback(false, emptyList(), "Network error: ${e.message}")
-                }
-
-                override fun onResponse(call: Call, response: Response) {
-                    response.use {
-                        try {
-                            val responseBody = response.body?.string() ?: "{}"
-
-                            if (response.isSuccessful) {
-                                val jsonResponse = JSONObject(responseBody)
-                                val success = jsonResponse.optBoolean("success", false)
-
-                                if (success) {
-                                    val reportsArray = jsonResponse.optJSONArray("reports") ?: JSONArray()
-                                    val reports = parseReportsFromJson(reportsArray)
-
-                                    android.util.Log.d("BackendClient", "✅ Successfully parsed ${reports.size} reports globally")
-                                    callback(true, reports, "Successfully fetched ${reports.size} reports")
-                                } else {
-                                    val errorMessage = jsonResponse.optString("message", "Unknown error")
-                                    callback(false, emptyList(), errorMessage)
-                                }
-                            } else {
-                                callback(false, emptyList(), "Server error: ${response.code}")
-                            }
-                        } catch (e: Exception) {
-                            android.util.Log.e("BackendClient", "❌ Error parsing all reports response: ${e.message}")
-                            callback(false, emptyList(), "Failed to parse server response: ${e.message}")
-                        }
+            // Wrap the callback to match our QueuedRequest type
+            val wrappedCallback: (Boolean, String) -> Unit = { success, message ->
+                if (success) {
+                    try {
+                        val reports = parseReportsFromJson(message)
+                        callback(success, reports, "Success")
+                    } catch (e: Exception) {
+                        callback(false, emptyList(), "Failed to parse reports: ${e.message}")
                     }
+                } else {
+                    callback(false, emptyList(), message)
                 }
-            })
+            }
+
+            val queuedRequest = QueuedRequest(request, wrappedCallback, 0, "fetchReports")
+            requestQueue.offer(queuedRequest)
+            processRequestQueue()
+
         } catch (e: Exception) {
+            android.util.Log.e("BackendClient", "❌ Error creating fetch request: ${e.message}")
             callback(false, emptyList(), "Request creation failed: ${e.message}")
         }
     }
-    // NEW: Parse reports from JSON array received from server
-    private fun parseReportsFromJson(reportsArray: JSONArray): List<Report> {
+
+    private fun parseReportsFromJson(responseBody: String): List<Report> {
         val reports = mutableListOf<Report>()
 
         try {
+            android.util.Log.d("BackendClient", "📋 Parsing response body: ${responseBody.take(200)}...")
+
+            val jsonResponse = JSONObject(responseBody)
+            val success = jsonResponse.optBoolean("success", false)
+
+            if (!success) {
+                android.util.Log.w("BackendClient", "⚠️ Server returned success=false")
+                return reports
+            }
+
+            val reportsArray = jsonResponse.optJSONArray("reports")
+            if (reportsArray == null) {
+                android.util.Log.w("BackendClient", "⚠️ No reports array in response")
+                return reports
+            }
+
+            android.util.Log.d("BackendClient", "📊 Processing ${reportsArray.length()} reports from server")
+
             for (i in 0 until reportsArray.length()) {
                 try {
-                    val reportJson = reportsArray.getJSONObject(i)
+                    val reportObj = reportsArray.getJSONObject(i)
 
-                    val id = reportJson.optString("id", UUID.randomUUID().toString())
-                    val lat = reportJson.optDouble("lat", 0.0)
-                    val lng = reportJson.optDouble("lng", 0.0)
-                    val content = reportJson.optString("content", "")
-                    val language = reportJson.optString("language", "en")
-                    val hasPhoto = reportJson.optBoolean("hasPhoto", false)
-                    val categoryCode = reportJson.optString("category", "safety")
-                    val timestamp = reportJson.optLong("timestamp", System.currentTimeMillis())
+                    val id = reportObj.optString("id", UUID.randomUUID().toString())
+                    val lat = reportObj.optDouble("lat", 0.0)
+                    val lng = reportObj.optDouble("lng", 0.0)
+                    val content = reportObj.optString("content", "")
+                    val language = reportObj.optString("language", "en")
+                    val hasPhoto = reportObj.optBoolean("hasPhoto", false)
+                    val timestamp = reportObj.optLong("timestamp", System.currentTimeMillis())
 
-                    // Parse category
+                    val categoryCode = reportObj.optString("category", "safety")
                     val category = ReportCategory.values().find { it.code == categoryCode }
                         ?: ReportCategory.SAFETY
 
@@ -217,6 +382,7 @@ class BackendClient {
             android.util.Log.e("BackendClient", "❌ Error parsing reports array: ${e.message}")
         }
 
+        android.util.Log.d("BackendClient", "✅ Successfully parsed ${reports.size} valid reports")
         return reports
     }
 
@@ -237,8 +403,7 @@ class BackendClient {
                     val json = JSONObject().apply {
                         put("lat", latitude)
                         put("lng", longitude)
-                        put("platform", "android")
-                        put("token", token)
+                        put("fcmToken", token)
                     }
 
                     val mediaType = "application/json; charset=utf-8".toMediaType()
@@ -249,34 +414,25 @@ class BackendClient {
                         .post(requestBody)
                         .build()
 
-                    client.newCall(request).enqueue(object : Callback {
-                        override fun onFailure(call: Call, e: IOException) {
-                            callback(false, "Subscription failed: ${e.message}")
-                        }
+                    val queuedRequest = QueuedRequest(request, callback, 0, "subscribeAlerts")
+                    requestQueue.offer(queuedRequest)
+                    processRequestQueue()
 
-                        override fun onResponse(call: Call, response: Response) {
-                            response.use {
-                                if (response.isSuccessful) {
-                                    val responseBody = response.body?.string() ?: "{}"
-                                    try {
-                                        val jsonResponse = JSONObject(responseBody)
-                                        val zones = jsonResponse.optJSONArray("affected_zones")
-                                        callback(true, "Subscribed to ${zones?.length() ?: 0} zones")
-                                    } catch (e: Exception) {
-                                        callback(true, "Subscribed successfully")
-                                    }
-                                } else {
-                                    callback(false, "Subscription error: ${response.code}")
-                                }
-                            }
-                        }
-                    })
                 } catch (e: Exception) {
-                    callback(false, "Subscription request failed: ${e.message}")
+                    callback(false, "Request creation failed: ${e.message}")
                 }
             }
-            .addOnFailureListener { e ->
-                callback(false, "FCM token error: ${e.message}")
-            }
+    }
+
+    // Method to check current queue status (useful for debugging)
+    fun getQueueStatus(): String {
+        return "Queue size: ${requestQueue.size}, Processing: ${isProcessingQueue.get()}, Recent requests: ${requestTimes.size}"
+    }
+
+    // Method to clear the queue if needed (emergency)
+    fun clearQueue() {
+        requestQueue.clear()
+        isProcessingQueue.set(false)
+        android.util.Log.w("BackendClient", "🧹 Request queue cleared")
     }
 }

@@ -1,4 +1,4 @@
-// File: managers/PreferencesManager.kt (Updated with Favorites support)
+// File: managers/PreferencesManager.kt
 package com.money.pinlocal.managers
 
 import android.content.Context
@@ -15,8 +15,7 @@ class PreferencesManager(private val context: Context) {
         private const val KEY_VIEWED_ALERTS = "viewed_alerts"
         private const val KEY_SAVED_REPORTS = "saved_reports"
         private const val KEY_LANGUAGE_CHANGE = "is_language_change"
-        private const val KEY_USER_HAS_CREATED_REPORTS = "user_has_created_reports"  // NEW: Track user interaction
-        // NEW: Favorites keys
+        private const val KEY_USER_HAS_CREATED_REPORTS = "user_has_created_reports"
         private const val KEY_FAVORITES = "favorites"
         private const val KEY_FAVORITE_ALERTS = "favorite_alerts"
         private const val KEY_VIEWED_FAVORITE_ALERTS = "viewed_favorite_alerts"
@@ -31,10 +30,12 @@ class PreferencesManager(private val context: Context) {
         const val ALERT_DISTANCE_STATE = 160934.0
     }
 
-    private val preferences: SharedPreferences =
+    // Make preferences accessible to ReportManager
+    val preferences: SharedPreferences =
         context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
 
-    // Language preferences
+    // ... rest of existing methods stay exactly the same ...
+
     fun getSavedLanguage(): String {
         return preferences.getString(KEY_LANGUAGE, "es") ?: "es"
     }
@@ -52,6 +53,7 @@ class PreferencesManager(private val context: Context) {
 
         context.resources.updateConfiguration(config, context.resources.displayMetrics)
     }
+
     fun getAlarmOverrideSilent(): Boolean {
         return preferences.getBoolean(KEY_ALARM_OVERRIDE_SILENT, false)
     }
@@ -59,7 +61,7 @@ class PreferencesManager(private val context: Context) {
     fun saveAlarmOverrideSilent(override: Boolean) {
         preferences.edit().putBoolean(KEY_ALARM_OVERRIDE_SILENT, override).apply()
     }
-    // Alert distance preferences
+
     fun getSavedAlertDistance(): Double {
         return preferences.getFloat(KEY_ALERT_DISTANCE, ALERT_DISTANCE_20_MILES.toFloat()).toDouble()
     }
@@ -82,7 +84,6 @@ class PreferencesManager(private val context: Context) {
         }
     }
 
-    // Viewed alerts
     fun getViewedAlerts(): Set<String> {
         return preferences.getStringSet(KEY_VIEWED_ALERTS, emptySet()) ?: emptySet()
     }
@@ -91,7 +92,6 @@ class PreferencesManager(private val context: Context) {
         preferences.edit().putStringSet(KEY_VIEWED_ALERTS, viewedAlerts).apply()
     }
 
-    // Reports persistence
     fun getSavedReports(): String {
         return preferences.getString(KEY_SAVED_REPORTS, "[]") ?: "[]"
     }
@@ -100,7 +100,6 @@ class PreferencesManager(private val context: Context) {
         preferences.edit().putString(KEY_SAVED_REPORTS, reportsJson).apply()
     }
 
-    // Language change tracking
     fun isLanguageChange(): Boolean {
         return preferences.getBoolean(KEY_LANGUAGE_CHANGE, false)
     }
@@ -109,7 +108,6 @@ class PreferencesManager(private val context: Context) {
         preferences.edit().putBoolean(KEY_LANGUAGE_CHANGE, isChange).apply()
     }
 
-    // NEW: Favorites persistence
     fun getSavedFavorites(): String {
         return preferences.getString(KEY_FAVORITES, "[]") ?: "[]"
     }
@@ -118,7 +116,6 @@ class PreferencesManager(private val context: Context) {
         preferences.edit().putString(KEY_FAVORITES, favoritesJson).apply()
     }
 
-    // NEW: Favorite alerts persistence
     fun getSavedFavoriteAlerts(): String {
         return preferences.getString(KEY_FAVORITE_ALERTS, "[]") ?: "[]"
     }
@@ -127,7 +124,6 @@ class PreferencesManager(private val context: Context) {
         preferences.edit().putString(KEY_FAVORITE_ALERTS, favoriteAlertsJson).apply()
     }
 
-    // NEW: Viewed favorite alerts
     fun getViewedFavoriteAlerts(): Set<String> {
         return preferences.getStringSet(KEY_VIEWED_FAVORITE_ALERTS, emptySet()) ?: emptySet()
     }
@@ -135,7 +131,7 @@ class PreferencesManager(private val context: Context) {
     fun saveViewedFavoriteAlerts(viewedFavoriteAlerts: Set<String>) {
         preferences.edit().putStringSet(KEY_VIEWED_FAVORITE_ALERTS, viewedFavoriteAlerts).apply()
     }
-    // NEW: User interaction tracking
+
     fun hasUserCreatedReports(): Boolean {
         return preferences.getBoolean(KEY_USER_HAS_CREATED_REPORTS, false)
     }

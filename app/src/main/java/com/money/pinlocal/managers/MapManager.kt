@@ -1,4 +1,4 @@
-// File: managers/MapManager.kt (Updated with Favorites - FIXED)
+// File: managers/MapManager.kt - FIXED to completely prevent duplicate report pins
 package com.money.pinlocal.managers
 
 import com.money.pinlocal.data.ReportCategory
@@ -33,25 +33,28 @@ class MapManager(private val context: Context) {
     private var currentSearchMarker: Marker? = null
     private val reportMarkers = mutableListOf<Marker>()
     private val reportCircles = mutableListOf<Polygon>()
-    private val favoriteMarkers = mutableListOf<Marker>()  // NEW: Favorite markers
+    private val favoriteMarkers = mutableListOf<Marker>()
     private var lastZoomTime = 0L
     private val zoomThrottleMs = 150L
+
+    // CRITICAL: Track which reports are already on the map to prevent duplicates
+    private val reportMarkersMap = mutableMapOf<String, Marker>() // reportId -> Marker
+    private val reportCirclesMap = mutableMapOf<String, Polygon>() // reportId -> Circle
 
     interface MapInteractionListener {
         fun onLongPress(location: GeoPoint)
         fun onReportMarkerClick(report: Report)
     }
 
-    // NEW: Interface for favorite marker interactions
     interface FavoriteMapInteractionListener {
         fun onFavoriteMarkerClick(favorite: FavoritePlace)
     }
 
     private fun getReportPinDrawable(category: ReportCategory): Int {
         return when (category) {
-            ReportCategory.SAFETY -> R.drawable.ic_report_marker        // Red
-            ReportCategory.FUN -> R.drawable.ic_report_marker           // Should use different icon
-            ReportCategory.LOST_MISSING -> R.drawable.ic_report_marker  // Should use different icon
+            ReportCategory.SAFETY -> R.drawable.ic_report_marker
+            ReportCategory.FUN -> R.drawable.ic_fun_marker
+            ReportCategory.LOST_MISSING -> R.drawable.ic_lost_marker
         }
     }
 
@@ -81,28 +84,33 @@ class MapManager(private val context: Context) {
 
                     override fun onZoom(event: org.osmdroid.events.ZoomEvent?): Boolean {
                         val currentTime = System.currentTimeMillis()
-                        if (currentTime - lastZoomTime < zoomThrottleMs) {
-                            return true
+                        if (currentTime - lastZoomTime > zoomThrottleMs) {
+                            lastZoomTime = currentTime
                         }
-                        lastZoomTime = currentTime
                         return true
                     }
                 })
             }
-
-            val defaultPoint = GeoPoint(40.7128, -74.0060)
-            mapView.controller.setZoom(15.0)
-            mapView.controller.setCenter(defaultPoint)
         } catch (e: Exception) {
-            // Fallback to basic map
-            try {
-                mapView.setTileSource(TileSourceFactory.MAPNIK)
-            } catch (fallbackE: Exception) {
-                // Log error but continue
-            }
+            android.util.Log.e("MapManager", "Error setting up map: ${e.message}")
         }
     }
 
+    fun enableMapInteraction(mapView: MapView, listener: MapInteractionListener) {
+        val mapEventReceiver = object : MapEventsReceiver {
+            override fun singleTapConfirmedHelper(p: GeoPoint?): Boolean = false
+
+            override fun longPressHelper(p: GeoPoint?): Boolean {
+                p?.let { listener.onLongPress(it) }
+                return true
+            }
+        }
+
+        val mapEventOverlay = MapEventsOverlay(mapEventReceiver)
+        mapView.overlays.add(0, mapEventOverlay)
+    }
+
+    // Keep original method name for compatibility
     fun setupMapLongPressListener(mapView: MapView, listener: MapInteractionListener) {
         val mapEventsReceiver = object : MapEventsReceiver {
             override fun singleTapConfirmedHelper(p: GeoPoint?): Boolean {
@@ -121,6 +129,7 @@ class MapManager(private val context: Context) {
         mapView.overlays.add(0, mapEventsOverlay)
     }
 
+    // Keep original method name for compatibility
     fun addLocationMarker(mapView: MapView, location: GeoPoint) {
         try {
             if (mapView.repository == null) {
@@ -165,15 +174,50 @@ class MapManager(private val context: Context) {
         }
     }
 
-    fun addSearchResultMarker(mapView: MapView, location: GeoPoint, address: Address) {
+    // New method with address support (can be used optionally)
+    fun updateCurrentLocation(mapView: MapView, location: GeoPoint, address: String?) {
         try {
-            if (mapView.repository == null) {
-                Handler(Looper.getMainLooper()).postDelayed({
-                    addSearchResultMarker(mapView, location, address)
-                }, 500)
-                return
+            currentLocationMarker?.let { marker ->
+                try {
+                    mapView.overlays.remove(marker)
+                } catch (e: Exception) {
+                    // Ignore removal errors
+                }
             }
 
+            currentLocationMarker = Marker(mapView).apply {
+                position = location
+                setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_BOTTOM)
+                icon = ContextCompat.getDrawable(context, R.drawable.ic_location_pin)
+                title = address ?: "Your Location"
+
+                alpha = 0f
+                ObjectAnimator.ofFloat(this, "alpha", 0f, 1f).apply {
+                    duration = 500
+                    interpolator = DecelerateInterpolator()
+                    start()
+                }
+            }
+
+            mapView.overlays.add(currentLocationMarker)
+            mapView.invalidate()
+        } catch (e: Exception) {
+            Handler(Looper.getMainLooper()).postDelayed({
+                try {
+                    updateCurrentLocation(mapView, location, address)
+                } catch (retryE: Exception) {
+                    // Give up if retry also fails
+                }
+            }, 1000)
+        }
+    }
+
+    fun animateToLocation(mapView: MapView, location: GeoPoint, zoomLevel: Double = 18.0) {
+        mapView.controller.animateTo(location, zoomLevel, 1000L)
+    }
+
+    fun addSearchResultMarker(mapView: MapView, location: GeoPoint, address: Address) {
+        try {
             currentSearchMarker?.let { marker ->
                 try {
                     mapView.overlays.remove(marker)
@@ -217,6 +261,7 @@ class MapManager(private val context: Context) {
         }
     }
 
+    // FIXED: Prevent duplicate report pins with comprehensive checks
     fun addReportToMap(mapView: MapView, report: Report, listener: MapInteractionListener) {
         try {
             if (mapView.repository == null) {
@@ -226,15 +271,35 @@ class MapManager(private val context: Context) {
                 return
             }
 
+            // CRITICAL: Check if this report is already on the map
+            if (reportMarkersMap.containsKey(report.id)) {
+                android.util.Log.d("MapManager", "⏭️ Report ${report.id} already on map, skipping duplicate")
+                return
+            }
+
+            // DOUBLE CHECK: Verify the report isn't in our lists either
+            val existingMarker = reportMarkers.find { marker ->
+                marker.title?.contains(report.category.getDisplayName(false)) == true &&
+                        marker.position.distanceToAsDouble(report.location) < 10.0 // Within 10 meters
+            }
+            if (existingMarker != null) {
+                android.util.Log.d("MapManager", "⏭️ Report ${report.id} appears to already exist at location, skipping")
+                return
+            }
+
+            android.util.Log.d("MapManager", "📍 Adding report ${report.id} to map")
+
+            // Create and add circle
             val circle = createReportCircle(report.location, report.category)
             mapView.overlays.add(circle)
             reportCircles.add(circle)
+            reportCirclesMap[report.id] = circle // Track the circle
 
+            // Create and add marker
             val marker = Marker(mapView).apply {
                 position = report.location
                 setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_BOTTOM)
 
-                // Use the specific drawable for each category
                 val drawableRes = when (report.category) {
                     ReportCategory.SAFETY -> R.drawable.ic_report_marker
                     ReportCategory.FUN -> R.drawable.ic_fun_marker
@@ -259,6 +324,9 @@ class MapManager(private val context: Context) {
 
             mapView.overlays.add(marker)
             reportMarkers.add(marker)
+            reportMarkersMap[report.id] = marker // Track the marker by report ID
+
+            android.util.Log.d("MapManager", "✅ Added report ${report.id} to map successfully")
             mapView.invalidate()
         } catch (e: Exception) {
             android.util.Log.e("MapManager", "Error adding report to map: ${e.message}")
@@ -272,53 +340,149 @@ class MapManager(private val context: Context) {
         }
     }
 
+    // Remove a specific report from the map
+    fun removeReportFromMap(mapView: MapView, report: Report) {
+        try {
+            if (mapView.repository == null) {
+                return
+            }
+
+            android.util.Log.d("MapManager", "🗑️ Removing report ${report.id} from map")
+
+            // Remove marker using tracked map
+            val marker = reportMarkersMap[report.id]
+            if (marker != null) {
+                try {
+                    mapView.overlays.remove(marker)
+                    reportMarkers.remove(marker)
+                    reportMarkersMap.remove(report.id)
+                    android.util.Log.d("MapManager", "✅ Removed marker for report ${report.id}")
+                } catch (e: Exception) {
+                    android.util.Log.e("MapManager", "Error removing marker: ${e.message}")
+                }
+            }
+
+            // Remove circle using tracked map
+            val circle = reportCirclesMap[report.id]
+            if (circle != null) {
+                try {
+                    mapView.overlays.remove(circle)
+                    reportCircles.remove(circle)
+                    reportCirclesMap.remove(report.id)
+                    android.util.Log.d("MapManager", "✅ Removed circle for report ${report.id}")
+                } catch (e: Exception) {
+                    android.util.Log.e("MapManager", "Error removing circle: ${e.message}")
+                }
+            }
+
+            mapView.invalidate()
+        } catch (e: Exception) {
+            android.util.Log.e("MapManager", "Error in removeReportFromMap: ${e.message}")
+        }
+    }
+
+    fun animateToReport(mapView: MapView, report: Report) {
+        mapView.controller.animateTo(report.location, 18.0, 1000L)
+
+        val reportMarker = reportMarkersMap[report.id]
+        reportMarker?.let { marker ->
+            marker.showInfoWindow()
+            ObjectAnimator.ofFloat(marker, "alpha", 1f, 0.5f, 1f).apply {
+                duration = 1000
+                repeatCount = 2
+                start()
+            }
+        }
+    }
+
+    // IMPROVED: Clear all report markers and circles with proper cleanup
+    fun clearAllReportMarkers(mapView: MapView) {
+        try {
+            android.util.Log.d("MapManager", "🧹 Clearing all report markers and circles")
+
+            // Remove all markers using tracked map
+            val markersToRemove = reportMarkersMap.values.toList()
+            for (marker in markersToRemove) {
+                try {
+                    mapView.overlays.remove(marker)
+                } catch (e: Exception) {
+                    // Continue on error
+                }
+            }
+
+            // Remove all circles using tracked map
+            val circlesToRemove = reportCirclesMap.values.toList()
+            for (circle in circlesToRemove) {
+                try {
+                    mapView.overlays.remove(circle)
+                } catch (e: Exception) {
+                    // Continue on error
+                }
+            }
+
+            // Clear all tracking collections
+            reportMarkers.clear()
+            reportCircles.clear()
+            reportMarkersMap.clear()
+            reportCirclesMap.clear()
+
+            mapView.invalidate()
+            android.util.Log.d("MapManager", "✅ Cleared all report markers and circles")
+        } catch (e: Exception) {
+            android.util.Log.e("MapManager", "Error clearing report markers: ${e.message}")
+        }
+    }
+
+    // NEW: Safe method to refresh all reports on map (prevents duplicates)
+    fun refreshReportsOnMap(mapView: MapView, reports: List<Report>, listener: MapInteractionListener) {
+        try {
+            android.util.Log.d("MapManager", "🔄 Refreshing map with ${reports.size} reports")
+
+            // Clear existing reports
+            clearAllReportMarkers(mapView)
+
+            // Add all reports fresh
+            reports.forEach { report ->
+                addReportToMap(mapView, report, listener)
+            }
+
+            android.util.Log.d("MapManager", "✅ Map refresh completed")
+        } catch (e: Exception) {
+            android.util.Log.e("MapManager", "Error refreshing reports on map: ${e.message}")
+        }
+    }
+
+    // NEW: Check if a report is already on the map
+    fun isReportOnMap(reportId: String): Boolean {
+        return reportMarkersMap.containsKey(reportId)
+    }
+
+    // NEW: Get count of reports currently on map
+    fun getReportCountOnMap(): Int {
+        return reportMarkersMap.size
+    }
+
     fun clearFavoriteMarkers(mapView: MapView) {
         try {
             android.util.Log.d("MapManager", "=== CLEARING FAVORITE MARKERS ===")
             android.util.Log.d("MapManager", "favoriteMarkers.size: ${favoriteMarkers.size}")
-            android.util.Log.d("MapManager", "mapView.overlays.size before: ${mapView.overlays.size}")
 
-            // Log all current overlays
-            mapView.overlays.forEachIndexed { index, overlay ->
-                if (overlay is Marker) {
-                    android.util.Log.d("MapManager", "Overlay $index: Marker with title '${overlay.title}'")
-                }
-            }
-
-            // Create a copy of the list to avoid concurrent modification
             val markersToRemove = favoriteMarkers.toList()
-
-            // Remove each favorite marker
             var removedCount = 0
+
             for ((index, marker) in markersToRemove.withIndex()) {
                 try {
-                    val wasInOverlays = mapView.overlays.contains(marker)
                     val wasRemoved = mapView.overlays.remove(marker)
-                    android.util.Log.d("MapManager", "Marker $index (${marker.title}): inOverlays=$wasInOverlays, removed=$wasRemoved")
+                    android.util.Log.d("MapManager", "Marker $index (${marker.title}): removed=$wasRemoved")
                     if (wasRemoved) removedCount++
                 } catch (e: Exception) {
                     android.util.Log.e("MapManager", "Error removing marker $index: ${e.message}")
                 }
             }
 
-            // Clear the favoriteMarkers list
             favoriteMarkers.clear()
-
             android.util.Log.d("MapManager", "Removed $removedCount markers from overlays")
-            android.util.Log.d("MapManager", "favoriteMarkers.size after clear: ${favoriteMarkers.size}")
-            android.util.Log.d("MapManager", "mapView.overlays.size after: ${mapView.overlays.size}")
-
-            // Force map refresh
             mapView.invalidate()
-
-            // Double-check: Log remaining overlays
-            android.util.Log.d("MapManager", "Remaining overlays after clear:")
-            mapView.overlays.forEachIndexed { index, overlay ->
-                if (overlay is Marker) {
-                    android.util.Log.d("MapManager", "  Remaining overlay $index: Marker '${overlay.title}'")
-                }
-            }
-
             android.util.Log.d("MapManager", "=== CLEAR FAVORITE MARKERS COMPLETED ===")
 
         } catch (e: Exception) {
@@ -326,13 +490,10 @@ class MapManager(private val context: Context) {
         }
     }
 
-    // FIXED: Complete addFavoriteToMap method
     fun addFavoriteToMap(mapView: MapView, favorite: FavoritePlace, listener: Any) {
         try {
             android.util.Log.d("MapManager", "=== addFavoriteToMap CALLED ===")
             android.util.Log.d("MapManager", "Favorite: ${favorite.name}")
-            android.util.Log.d("MapManager", "MapView repository null: ${mapView.repository == null}")
-            android.util.Log.d("MapManager", "Listener type: ${listener::class.java.simpleName}")
 
             if (mapView.repository == null) {
                 android.util.Log.w("MapManager", "MapView repository is null, scheduling retry")
@@ -352,7 +513,6 @@ class MapManager(private val context: Context) {
                 snippet = favorite.getEnabledCategoriesText(false)
 
                 setOnMarkerClickListener { _, _ ->
-                    // Handle favorite marker click
                     if (listener is FavoriteMapInteractionListener) {
                         listener.onFavoriteMarkerClick(favorite)
                     }
@@ -369,111 +529,19 @@ class MapManager(private val context: Context) {
 
             mapView.overlays.add(marker)
             favoriteMarkers.add(marker)
+
+            android.util.Log.d("MapManager", "✅ Added favorite marker successfully")
             mapView.invalidate()
 
-            android.util.Log.d("MapManager", "Added favorite marker, total markers: ${favoriteMarkers.size}")
-
         } catch (e: Exception) {
-            android.util.Log.e("MapManager", "Error adding favorite marker: ${e.message}")
+            android.util.Log.e("MapManager", "Error in addFavoriteToMap: ${e.message}")
             Handler(Looper.getMainLooper()).postDelayed({
                 try {
                     addFavoriteToMap(mapView, favorite, listener)
                 } catch (retryE: Exception) {
-                    android.util.Log.e("MapManager", "Retry failed: ${retryE.message}")
+                    android.util.Log.e("MapManager", "Retry failed for favorite: ${retryE.message}")
                 }
             }, 1000)
-        }
-    }
-
-    // NEW: Remove specific favorite from map
-    fun removeFavoriteFromMap(mapView: MapView, favorite: FavoritePlace) {
-        try {
-            val markerToRemove = favoriteMarkers.find { marker ->
-                marker.position.latitude == favorite.location.latitude &&
-                        marker.position.longitude == favorite.location.longitude
-            }
-            markerToRemove?.let { marker ->
-                try {
-                    mapView.overlays.remove(marker)
-                    favoriteMarkers.remove(marker)
-                    mapView.invalidate()
-                } catch (e: Exception) {
-                    // Log error but continue
-                }
-            }
-        } catch (e: Exception) {
-            // Log error but continue
-        }
-    }
-
-    // NEW: Animate to favorite location
-    fun animateToFavorite(mapView: MapView, favorite: FavoritePlace) {
-        mapView.controller.animateTo(favorite.location, 16.0, 1000L)
-
-        val favoriteMarker = favoriteMarkers.find { marker ->
-            marker.position.latitude == favorite.location.latitude &&
-                    marker.position.longitude == favorite.location.longitude
-        }
-
-        favoriteMarker?.let { marker ->
-            marker.showInfoWindow()
-            ObjectAnimator.ofFloat(marker, "alpha", 1f, 0.5f, 1f).apply {
-                duration = 1000
-                repeatCount = 2
-                start()
-            }
-        }
-    }
-
-    fun removeReportFromMap(mapView: MapView, report: Report) {
-        try {
-            if (mapView.repository == null) {
-                return
-            }
-
-            val markerToRemove = reportMarkers.find { marker ->
-                marker.position.latitude == report.location.latitude &&
-                        marker.position.longitude == report.location.longitude
-            }
-            markerToRemove?.let { marker ->
-                try {
-                    mapView.overlays.remove(marker)
-                    reportMarkers.remove(marker)
-                } catch (e: Exception) {
-                    // Log error but continue
-                }
-            }
-
-            if (reportCircles.isNotEmpty()) {
-                try {
-                    val circle = reportCircles.removeAt(0)
-                    mapView.overlays.remove(circle)
-                } catch (e: Exception) {
-                    // Log error but continue
-                }
-            }
-
-            mapView.invalidate()
-        } catch (e: Exception) {
-            // Log error but continue
-        }
-    }
-
-    fun animateToReport(mapView: MapView, report: Report) {
-        mapView.controller.animateTo(report.location, 18.0, 1000L)
-
-        val reportMarker = reportMarkers.find { marker ->
-            marker.position.latitude == report.location.latitude &&
-                    marker.position.longitude == report.location.longitude
-        }
-
-        reportMarker?.let { marker ->
-            marker.showInfoWindow()
-            ObjectAnimator.ofFloat(marker, "alpha", 1f, 0.5f, 1f).apply {
-                duration = 1000
-                repeatCount = 2
-                start()
-            }
         }
     }
 

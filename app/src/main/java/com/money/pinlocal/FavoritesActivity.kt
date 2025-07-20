@@ -1,4 +1,4 @@
-// File: FavoritesActivity.kt - Apple-inspired Design
+// File: FavoritesActivity.kt - Apple-inspired Design (FIXED)
 package com.money.pinlocal
 
 import android.os.Bundle
@@ -10,6 +10,7 @@ import android.widget.ImageButton
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
 import com.money.pinlocal.data.FavoritePlace
+import com.money.pinlocal.data.FavoriteAlert
 import com.money.pinlocal.managers.FavoriteManager
 import com.money.pinlocal.managers.PreferencesManager
 import com.money.pinlocal.managers.ReportManager
@@ -180,7 +181,6 @@ class FavoritesActivity : AppCompatActivity(), FavoriteManager.FavoriteListener 
         setContentView(mainLayout)
     }
 
-
     private fun loadFavorites() {
         favoriteManager.loadSavedData()
     }
@@ -191,11 +191,11 @@ class FavoritesActivity : AppCompatActivity(), FavoriteManager.FavoriteListener 
         }
     }
 
-    override fun onFavoriteAlertsUpdated(alerts: List<com.money.pinlocal.data.FavoriteAlert>, hasUnviewed: Boolean) {
+    override fun onFavoriteAlertsUpdated(alerts: List<FavoriteAlert>, hasUnviewed: Boolean) {
         // Handle alert updates if needed
     }
 
-    override fun onNewFavoriteAlerts(alerts: List<com.money.pinlocal.data.FavoriteAlert>) {
+    override fun onNewFavoriteAlerts(alerts: List<FavoriteAlert>) {
         // Handle new alerts if needed
     }
 
@@ -294,7 +294,6 @@ class FavoritesActivity : AppCompatActivity(), FavoriteManager.FavoriteListener 
             orientation = LinearLayout.HORIZONTAL
             gravity = android.view.Gravity.END
         }
-
 
         val deleteButton = Button(this).apply {
             text = if (isSpanish) "Eliminar" else "Delete"

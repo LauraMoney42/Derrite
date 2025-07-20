@@ -31,7 +31,7 @@ class LocationManager(private val context: Context) {
     fun hasLocationPermission(): Boolean {
         return ContextCompat.checkSelfPermission(
             context,
-            Manifest.permission.ACCESS_COARSE_LOCATION
+            Manifest.permission.ACCESS_FINE_LOCATION
         ) == PackageManager.PERMISSION_GRANTED
     }
 
@@ -43,9 +43,10 @@ class LocationManager(private val context: Context) {
 
             val locationRequest = LocationRequest.Builder(
                 Priority.PRIORITY_HIGH_ACCURACY,
-                30000
+                15000  // Reduced from 30000 for more frequent updates
             ).apply {
-                setMinUpdateIntervalMillis(15000)
+                setMinUpdateIntervalMillis(10000)  // Reduced from 15000
+                setMaxUpdateDelayMillis(30000)  // Add max delay
             }.build()
 
             locationCallback = object : LocationCallback() {

@@ -1,4 +1,4 @@
-// File: managers/ReportManager.kt
+// File: managers/ReportManager.kt - PRIVACY-SAFE SOLUTION
 package com.money.pinlocal.managers
 
 import android.graphics.Bitmap
@@ -11,9 +11,12 @@ class ReportManager(private val preferencesManager: PreferencesManager) {
 
     companion object {
         private const val REPORT_DURATION_HOURS = 8L
+        private const val KEY_LAST_REPORT_TIMESTAMP = "last_report_timestamp"
+        private const val ALERT_COOLDOWN_MS = 60000L // 60 seconds - don't check alerts for 1 minute after creating a report
     }
 
     private val activeReports = mutableListOf<Report>()
+    private var lastReportCreatedTimestamp = 0L
 
     fun createReport(
         location: GeoPoint,
@@ -35,15 +38,46 @@ class ReportManager(private val preferencesManager: PreferencesManager) {
         )
 
         activeReports.add(report)
+
+        // PRIVACY-SAFE: Just track WHEN we created a report, not what it was
+        lastReportCreatedTimestamp = System.currentTimeMillis()
+        preferencesManager.preferences.edit()
+            .putLong(KEY_LAST_REPORT_TIMESTAMP, lastReportCreatedTimestamp)
+            .apply()
+
+        android.util.Log.d("ReportManager", "Created report, alert cooldown until: ${lastReportCreatedTimestamp + ALERT_COOLDOWN_MS}")
+
         saveReportsToPreferences()
         return report
+    }
+
+    // PRIVACY-SAFE: Check if we should skip alerts (recent report creation)
+    fun shouldSkipAlertsCheck(): Boolean {
+        val currentTime = System.currentTimeMillis()
+        val timeSinceLastReport = currentTime - lastReportCreatedTimestamp
+        val shouldSkip = timeSinceLastReport < ALERT_COOLDOWN_MS
+
+        if (shouldSkip) {
+            android.util.Log.d("ReportManager", "Skipping alerts check - recent report created ${timeSinceLastReport}ms ago")
+        }
+
+        return shouldSkip
+    }
+
+    // Load the last report timestamp
+    fun loadLastReportTimestamp() {
+        lastReportCreatedTimestamp = preferencesManager.preferences.getLong(KEY_LAST_REPORT_TIMESTAMP, 0L)
+        android.util.Log.d("ReportManager", "Loaded last report timestamp: $lastReportCreatedTimestamp")
     }
 
     fun getActiveReports(): List<Report> = activeReports.toList()
 
     fun addReport(report: Report) {
-        activeReports.add(report)
-        saveReportsToPreferences()
+        val existingReport = activeReports.find { it.id == report.id }
+        if (existingReport == null) {
+            activeReports.add(report)
+            saveReportsToPreferences()
+        }
     }
 
     fun removeReport(report: Report) {
@@ -103,7 +137,6 @@ class ReportManager(private val preferencesManager: PreferencesManager) {
 
                     val parts = line.split(":::")
                     if (parts.size >= 8) {
-                        // Handle backward compatibility - if no category, default to SAFETY
                         val categoryCode = if (parts.size > 8) parts[8] else "safety"
                         val category = ReportCategory.values().find { it.code == categoryCode }
                             ?: ReportCategory.SAFETY
