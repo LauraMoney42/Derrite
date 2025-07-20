@@ -1,4 +1,4 @@
-// File: managers/AlarmManager.kt (Complete Updated Version)
+// File: managers/AlarmManager.kt (Updated with Custom .wav Support)
 package com.money.pinlocal.managers
 
 import android.app.NotificationChannel
@@ -10,6 +10,7 @@ import android.media.AudioAttributes
 import android.media.AudioManager
 import android.media.MediaPlayer
 import android.media.RingtoneManager
+import android.net.Uri
 import android.os.Build
 import android.os.VibrationEffect
 import android.os.Vibrator
@@ -29,6 +30,9 @@ class AlarmManager(
         private const val CHANNEL_ID_ALARM = "pinlocal_alarm_alerts"
         private const val NOTIFICATION_ID_ALERT = 1001
         private const val ALARM_DURATION_MS = 3000L // 3 seconds
+
+        // Custom alarm sound resource ID
+        private val CUSTOM_ALARM_SOUND = R.raw.safety_alarm
     }
 
     private var alarmPlayer: MediaPlayer? = null
@@ -64,8 +68,10 @@ class AlarmManager(
                 vibrationPattern = longArrayOf(0, 500, 200, 500, 200, 500)
                 setBypassDnd(true) // Override Do Not Disturb
 
-                // Set custom alarm sound
-                val alarmUri = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_ALARM)
+                // Try to set custom alarm sound for notification channel
+                val customSoundUri = getCustomAlarmUri()
+                val alarmUri = customSoundUri
+                    ?: RingtoneManager.getDefaultUri(RingtoneManager.TYPE_ALARM)
                     ?: RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION)
 
                 val audioAttributes = AudioAttributes.Builder()
@@ -81,7 +87,19 @@ class AlarmManager(
         }
     }
 
-// Main method to trigger alert - checks user preference AND category
+    /**
+     * Get the URI for the custom alarm sound
+     */
+    private fun getCustomAlarmUri(): Uri? {
+        return try {
+            Uri.parse("android.resource://${context.packageName}/$CUSTOM_ALARM_SOUND")
+        } catch (e: Exception) {
+            android.util.Log.w("AlarmManager", "Custom alarm sound not found: ${e.message}")
+            null
+        }
+    }
+
+    // Main method to trigger alert - checks user preference AND category
     fun triggerAlert(title: String, message: String, category: String = "SAFETY") {
         val isSpanish = preferencesManager.getSavedLanguage() == "es"
         val shouldOverrideSilent = preferencesManager.getAlarmOverrideSilent()
@@ -113,8 +131,8 @@ class AlarmManager(
         val maxVolume = audioManager.getStreamMaxVolume(AudioManager.STREAM_ALARM)
         audioManager.setStreamVolume(AudioManager.STREAM_ALARM, maxVolume, 0)
 
-        // Play more intense alarm
-        playAlarmSound()
+        // Play custom alarm sound
+        playCustomAlarmSound()
 
         // Stronger vibration pattern
         triggerIntenseVibration()
@@ -178,6 +196,7 @@ class AlarmManager(
             android.util.Log.e("AlarmManager", "Error triggering intense vibration: ${e.message}")
         }
     }
+
     private fun triggerNormalNotification(title: String, message: String, category: String, isSpanish: Boolean) {
         val intent = Intent(context, MainActivity::class.java).apply {
             flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
@@ -208,10 +227,75 @@ class AlarmManager(
         notificationManager.notify(NOTIFICATION_ID_ALERT, notification)
     }
 
-    private fun playAlarmSound() {
+    /**
+     * Play custom alarm sound with enhanced fallback system
+     */
+    private fun playCustomAlarmSound() {
         try {
             stopAlarmSound() // Stop any existing alarm
 
+            // First, try to play the custom .wav file
+            if (tryPlayCustomSound()) {
+                android.util.Log.d("AlarmManager", "Playing custom alarm sound")
+                return
+            }
+
+            // If custom sound fails, fall back to system sounds
+            android.util.Log.w("AlarmManager", "Custom sound failed, using system fallback")
+            playSystemAlarmSound()
+
+        } catch (e: Exception) {
+            android.util.Log.e("AlarmManager", "Error in playCustomAlarmSound: ${e.message}")
+            playFallbackSound()
+        }
+    }
+
+    /**
+     * Attempt to play the custom .wav sound
+     * @return true if successful, false if failed
+     */
+    private fun tryPlayCustomSound(): Boolean {
+        return try {
+            val customUri = getCustomAlarmUri() ?: return false
+
+            alarmPlayer = MediaPlayer().apply {
+                setDataSource(context, customUri)
+
+                // Configure to override silent mode - same as original
+                setAudioAttributes(
+                    AudioAttributes.Builder()
+                        .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
+                        .setUsage(AudioAttributes.USAGE_ALARM) // This overrides silent mode
+                        .build()
+                )
+
+                isLooping = true
+                setVolume(1.0f, 1.0f) // Maximum volume
+                prepareAsync()
+
+                setOnPreparedListener { player ->
+                    player.start()
+                    android.util.Log.d("AlarmManager", "Custom alarm sound started")
+                }
+
+                setOnErrorListener { _, what, extra ->
+                    android.util.Log.e("AlarmManager", "Custom sound error: what=$what, extra=$extra")
+                    playSystemAlarmSound()
+                    true
+                }
+            }
+            true
+        } catch (e: Exception) {
+            android.util.Log.e("AlarmManager", "Failed to play custom sound: ${e.message}")
+            false
+        }
+    }
+
+    /**
+     * Play system alarm sound (original implementation)
+     */
+    private fun playSystemAlarmSound() {
+        try {
             // Try to get the most urgent/alarming sound available
             val alarmUri = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_ALARM)
                 ?: RingtoneManager.getDefaultUri(RingtoneManager.TYPE_RINGTONE) // Often more urgent than notification
@@ -242,10 +326,11 @@ class AlarmManager(
                 }
             }
         } catch (e: Exception) {
-            android.util.Log.e("AlarmManager", "Error playing alarm sound: ${e.message}")
+            android.util.Log.e("AlarmManager", "Error playing system alarm sound: ${e.message}")
             playFallbackSound()
         }
     }
+
     private fun playFallbackSound() {
         try {
             val audioManager = context.getSystemService(Context.AUDIO_SERVICE) as AudioManager

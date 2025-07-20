@@ -209,8 +209,8 @@ class MainActivity : AppCompatActivity(),
 
     private fun fetchAllReportsInitially() {
         val isSpanish = preferencesManager.getSavedLanguage() == "es"
-        val fetchMessage = if (isSpanish) "Cargando todos los reportes..." else "Loading all reports..."
-        showStatusCard(fetchMessage, isLoading = true)
+//        val fetchMessage = if (isSpanish) "Cargando todos los pins..." else "Loading all pins..."
+//        showStatusCard(fetchMessage, isLoading = true)
 
         android.util.Log.d("MainActivity", "INITIAL FETCH - Starting...")
 
@@ -238,15 +238,15 @@ class MainActivity : AppCompatActivity(),
                     // Use the new refresh method to add all reports safely
                     if (::mapView.isInitialized && mapView.repository != null) {
                         mapManager.refreshReportsOnMap(mapView, validReports, this)
-                        android.util.Log.d("MainActivity", "Refreshed map with ${validReports.size} reports")
+                        android.util.Log.d("MainActivity", "Refreshed map with ${validReports.size} pins")
                     } else {
-                        android.util.Log.e("MainActivity", "MapView not ready for initial reports")
+                        android.util.Log.e("MainActivity", "MapView not ready for initial pins")
                     }
 
                     val successMessage = if (isSpanish)
-                        "Cargados ${validReports.size} reportes globalmente"
+                        "Cargados ${validReports.size} pins globalmente"
                     else
-                        "Loaded ${validReports.size} reports globally"
+                        "Loaded ${validReports.size} pins globally"
                     showStatusCard(successMessage, isLoading = false)
 
                     // Check for alerts after initial reports are loaded
@@ -441,9 +441,9 @@ class MainActivity : AppCompatActivity(),
         // Show immediate feedback that report is being processed
         val isSpanish = preferencesManager.getSavedLanguage() == "es"
         val processingMessage = if (isSpanish) {
-            "Enviando reporte..."
+            "Enviando pin..."
         } else {
-            "Sending report..."
+            "Sending pin..."
         }
         showStatusCard(processingMessage, isLoading = true)
 
@@ -482,13 +482,13 @@ class MainActivity : AppCompatActivity(),
                 if (success) {
                     android.util.Log.d("MainActivity", "Report successfully submitted to server")
                     subscribeToAlertsForLocation(location.latitude, location.longitude)
-
-                    val successMessage = if (isSpanish) {
-                        if (photo != null) "Reporte enviado con foto" else "Reporte enviado"
-                    } else {
-                        if (photo != null) "Report sent with photo" else "Report sent"
-                    }
-                    showStatusCard(successMessage, isLoading = false)
+//
+//                    val successMessage = if (isSpanish) {
+//                        if (photo != null) "Reporte enviado con foto" else "Reporte enviado"
+//                    } else {
+//                        if (photo != null) "Report sent with photo" else "Report sent"
+//                    }
+//                    showStatusCard(successMessage, isLoading = false)
                     Handler(Looper.getMainLooper()).postDelayed({ hideStatusCard() }, 3000)
                 } else {
                     android.util.Log.e("MainActivity", "Failed to submit report: $message")
@@ -498,9 +498,9 @@ class MainActivity : AppCompatActivity(),
                         message.contains("Rate limit", ignoreCase = true) ||
                                 message.contains("429", ignoreCase = true) -> {
                             if (isSpanish) {
-                                "Demasiadas peticiones. Tu reporte se enviará en unos momentos..."
+                                "Demasiadas peticiones. Tu pin se enviará en unos momentos..."
                             } else {
-                                "Too many requests. Your report will be sent shortly..."
+                                "Too many requests. Your pin will be sent shortly..."
                             }
                         }
                         message.contains("Network error", ignoreCase = true) -> {
@@ -519,9 +519,9 @@ class MainActivity : AppCompatActivity(),
                         }
                         else -> {
                             if (isSpanish) {
-                                "Error enviando reporte: $message"
+                                "Error enviando pin: $message"
                             } else {
-                                "Error sending report: $message"
+                                "Error sending pin: $message"
                             }
                         }
                     }
@@ -858,10 +858,10 @@ class MainActivity : AppCompatActivity(),
         val isSpanish = preferencesManager.getSavedLanguage() == "es"
 
         val options = if (isSpanish) {
-            arrayOf("Crear Reporte", "Agregar a Favoritos", "Cancelar")
-        } else {
-            arrayOf("Create Report", "Add to Favorites", "Cancel")
-        }
+                arrayOf("Crear Nuevo Pin", "Agregar a Favoritos", "Cancelar")
+            } else {
+                arrayOf("Create New Pin", "Add to Favorites", "Cancel")
+            }
 
         AlertDialog.Builder(this)
             .setTitle(if (isSpanish) "¿Qué deseas hacer?" else "What would you like to do?")

@@ -30,7 +30,7 @@
             android:id="@+id/edit_favorite_name"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:hint="Name (e.g., Emma's School, Home, Work)"
+            android:hint="Name (e.g., School, Work, Place A(for more security), etc)"
             android:textColor="@color/white"
             android:textColorHint="@color/text_hint"
             android:maxLength="50"
