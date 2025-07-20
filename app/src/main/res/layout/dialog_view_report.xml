@@ -3,54 +3,57 @@
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
     android:orientation="vertical"
-    android:padding="24dp">
+    android:padding="16dp">
 
     <TextView
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="@string/safety_report"
+        android:text="Safety Report"
         android:textSize="18sp"
-        android:textStyle="bold"
+        android:gravity="center"
         android:layout_marginBottom="16dp" />
+
+    <!-- Changed from Button to TextView for hyperlink style -->
+    <TextView
+        android:id="@+id/btn_translate_report"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Translate"
+        android:textColor="#2196F3"
+        android:textSize="16sp"
+        android:layout_gravity="start"
+        android:padding="8dp"
+        android:layout_marginBottom="16dp"
+        android:background="?android:attr/selectableItemBackground"
+        android:clickable="true"
+        android:focusable="true" />
 
     <TextView
         android:id="@+id/text_report_content"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:textSize="14sp"
-        android:layout_marginBottom="16dp"
-        android:minHeight="60dp" />
+        android:text="Report content goes here"
+        android:layout_marginBottom="16dp" />
+
+    <TextView
+        android:id="@+id/text_report_time"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Time info"
+        android:layout_marginBottom="16dp" />
 
     <ImageView
         android:id="@+id/image_report_photo"
         android:layout_width="match_parent"
         android:layout_height="200dp"
         android:layout_marginBottom="16dp"
-        android:scaleType="centerCrop"
-        android:background="@color/surface_variant"
         android:visibility="gone" />
 
-    <TextView
-        android:id="@+id/text_report_time"
-        android:layout_width="match_parent"
+    <Button
+        android:id="@+id/btn_close"
+        android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:textSize="12sp"
-        android:textColor="@color/text_secondary"
-        android:layout_marginBottom="24dp" />
-
-    <LinearLayout
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:orientation="horizontal"
-        android:gravity="end">
-
-        <Button
-            android:id="@+id/btn_close"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="@string/close"
-            style="@style/Widget.Material3.Button" />
-
-    </LinearLayout>
+        android:text="Close"
+        android:layout_gravity="center" />
 
 </LinearLayout>

@@ -2,6 +2,7 @@
 package com.money.pinlocal.managers
 
 import android.util.Base64
+import android.graphics.Paint
 import com.money.pinlocal.BackendClient
 import android.app.AlertDialog
 import android.content.Context
@@ -1074,22 +1075,87 @@ class DialogManager(
 
             dialogLayout.addView(photoImageView)
         }
-
-        // Translate button
-        val btnTranslate = Button(context).apply {
+        val btnTranslate = TextView(context).apply {
             text = if (isSpanish) "Traducir" else "Translate"
-            setTextColor(Color.WHITE)
-            setBackgroundColor(Color.parseColor("#4CAF50"))
-            setPadding(20, 16, 20, 16)
+            setTextColor(Color.parseColor("#2196F3")) // Blue color for hyperlink
             textSize = 16f
+            setPadding(0, 16, 0, 16)
+            paintFlags = paintFlags or Paint.UNDERLINE_TEXT_FLAG // Underline for hyperlink style
             layoutParams = LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT, // Only as wide as needed
                 LinearLayout.LayoutParams.WRAP_CONTENT
             ).apply {
                 setMargins(0, 0, 0, 24)
+                gravity = android.view.Gravity.START // Left aligned
             }
+
+            // Add ripple effect when clicked
+            background = android.graphics.drawable.RippleDrawable(
+                android.content.res.ColorStateList.valueOf(Color.parseColor("#E3F2FD")),
+                null,
+                null
+            )
+
+            // Add some padding for easier clicking
+            setPadding(8, 8, 8, 8)
         }
         dialogLayout.addView(btnTranslate)
+
+// Update the click listener accordingly - the functionality remains the same
+        var isTranslated = false
+
+        btnTranslate.setOnClickListener {
+            if (!isTranslated) {
+                btnTranslate.text = if (isSpanish) "Traduciendo..." else "Translating..."
+                btnTranslate.setTextColor(Color.parseColor("#666666")) // Gray during loading
+                btnTranslate.paintFlags = btnTranslate.paintFlags and Paint.UNDERLINE_TEXT_FLAG.inv() // Remove underline during loading
+
+                val targetLang = preferencesManager.getSavedLanguage()
+                translationManager.translateText(
+                    text = report.originalText,
+                    fromLang = report.originalLanguage,
+                    toLang = targetLang,
+                    onSuccess = { translatedText ->
+                        textReportContent.text = translatedText
+                        btnTranslate.text = if (isSpanish) "Mostrar Original" else "Show Original"
+                        btnTranslate.setTextColor(Color.parseColor("#2196F3")) // Back to blue
+                        btnTranslate.paintFlags = btnTranslate.paintFlags or Paint.UNDERLINE_TEXT_FLAG // Add underline back
+                        isTranslated = true
+                    },
+                    onError = { error ->
+                        btnTranslate.text = if (isSpanish) "Error en traducción" else "Translation Failed"
+                        btnTranslate.setTextColor(Color.parseColor("#F44336")) // Red for error
+                        btnTranslate.paintFlags = btnTranslate.paintFlags or Paint.UNDERLINE_TEXT_FLAG
+
+                        Handler(Looper.getMainLooper()).postDelayed({
+                            btnTranslate.text = if (isSpanish) "Traducir" else "Translate"
+                            btnTranslate.setTextColor(Color.parseColor("#2196F3")) // Back to blue
+                        }, 2000)
+                    }
+                )
+            } else {
+                textReportContent.text = report.originalText
+                btnTranslate.text = if (isSpanish) "Traducir" else "Translate"
+                btnTranslate.setTextColor(Color.parseColor("#2196F3"))
+                btnTranslate.paintFlags = btnTranslate.paintFlags or Paint.UNDERLINE_TEXT_FLAG
+                isTranslated = false
+            }
+        }
+//        // Translate button
+//        val btnTranslate = Button(context).apply {
+//            text = if (isSpanish) "Traducir" else "Translate"
+//            setTextColor(Color.WHITE)
+//            setBackgroundColor(Color.parseColor("#4CAF50"))
+//            setPadding(20, 16, 20, 16)
+//            textSize = 16f
+//            layoutParams = LinearLayout.LayoutParams(
+//                LinearLayout.LayoutParams.MATCH_PARENT,
+//                LinearLayout.LayoutParams.WRAP_CONTENT
+//            ).apply {
+//                setMargins(0, 0, 0, 24)
+//            }
+//        }
+//        dialogLayout.addView(btnTranslate)
 
         // Time info
         val timeText = TextView(context).apply {
@@ -1122,7 +1188,6 @@ class DialogManager(
 
         dialog.window?.setBackgroundDrawableResource(android.R.color.transparent)
 
-        var isTranslated = false
 
         btnTranslate.setOnClickListener {
             if (!isTranslated) {
