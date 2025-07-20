@@ -46,7 +46,110 @@ class BackendClient {
         val retryCount: Int = 0,
         val requestType: String = "generic"
     )
+    private fun parseReportsFromJson(responseBody: String): List<Report> {
+        val reports = mutableListOf<Report>()
 
+        try {
+            android.util.Log.d("BackendClient", "📋 Parsing response body: ${responseBody.take(200)}...")
+
+            val jsonResponse = JSONObject(responseBody)
+            val success = jsonResponse.optBoolean("success", false)
+
+            if (!success) {
+                android.util.Log.w("BackendClient", "⚠️ Server returned success=false")
+                return reports
+            }
+
+            val reportsArray = jsonResponse.optJSONArray("reports")
+            if (reportsArray == null) {
+                android.util.Log.w("BackendClient", "⚠️ No reports array in response")
+                return reports
+            }
+
+            android.util.Log.d("BackendClient", "📊 Processing ${reportsArray.length()} reports from server")
+
+            for (i in 0 until reportsArray.length()) {
+                try {
+                    val reportObj = reportsArray.getJSONObject(i)
+
+                    val id = reportObj.optString("id", UUID.randomUUID().toString())
+                    val lat = reportObj.optDouble("lat", 0.0)
+                    val lng = reportObj.optDouble("lng", 0.0)
+                    val content = reportObj.optString("content", "")
+                    val language = reportObj.optString("language", "en")
+                    val hasPhoto = reportObj.optBoolean("hasPhoto", false)
+                    val timestamp = reportObj.optLong("timestamp", System.currentTimeMillis())
+
+                    val categoryCode = reportObj.optString("category", "safety")
+                    val category = ReportCategory.values().find { it.code == categoryCode }
+                        ?: ReportCategory.SAFETY
+
+                    // Calculate expiration (8 hours from timestamp)
+                    val expiresAt = timestamp + (8 * 60 * 60 * 1000)
+
+                    // Convert photo from base64 to bitmap if present
+                    var photoBitmap: android.graphics.Bitmap? = null
+                    if (hasPhoto) {
+                        try {
+                            val photoData = reportObj.optString("photo", null)
+                            if (!photoData.isNullOrEmpty()) {
+                                // Remove the data:image/jpeg;base64, prefix if present
+                                val base64Data = if (photoData.startsWith("data:image")) {
+                                    photoData.substring(photoData.indexOf(",") + 1)
+                                } else {
+                                    photoData
+                                }
+
+                                // Decode base64 to byte array
+                                val decodedBytes = android.util.Base64.decode(base64Data, android.util.Base64.NO_WRAP)
+
+                                // Convert byte array to bitmap
+                                photoBitmap = android.graphics.BitmapFactory.decodeByteArray(decodedBytes, 0, decodedBytes.size)
+
+                                if (photoBitmap != null) {
+                                    android.util.Log.d("BackendClient", "✅ Successfully converted photo for report $id")
+                                } else {
+                                    android.util.Log.w("BackendClient", "⚠️ Failed to decode photo bitmap for report $id")
+                                }
+                            }
+                        } catch (e: Exception) {
+                            android.util.Log.e("BackendClient", "❌ Error converting photo for report $id: ${e.message}")
+                            photoBitmap = null
+                        }
+                    }
+
+                    // Only include non-expired reports
+                    if (expiresAt > System.currentTimeMillis()) {
+                        val report = Report(
+                            id = id,
+                            location = GeoPoint(lat, lng),
+                            originalText = content,
+                            originalLanguage = language,
+                            hasPhoto = hasPhoto,
+                            photo = photoBitmap, // Now properly converted from base64!
+                            timestamp = timestamp,
+                            expiresAt = expiresAt,
+                            category = category
+                        )
+
+                        reports.add(report)
+                        android.util.Log.d("BackendClient", "📍 Parsed report: ${category.displayName} - ${content.take(30)}... [Photo: ${if (photoBitmap != null) "Yes" else "No"}]")
+                    } else {
+                        android.util.Log.d("BackendClient", "⏰ Skipping expired report: $id")
+                    }
+
+                } catch (e: Exception) {
+                    android.util.Log.e("BackendClient", "❌ Error parsing individual report: ${e.message}")
+                    continue
+                }
+            }
+        } catch (e: Exception) {
+            android.util.Log.e("BackendClient", "❌ Error parsing reports array: ${e.message}")
+        }
+
+        android.util.Log.d("BackendClient", "✅ Successfully parsed ${reports.size} valid reports")
+        return reports
+    }
     // Rate limiting check
     private fun canMakeRequest(): Boolean {
         val now = System.currentTimeMillis()
@@ -160,11 +263,9 @@ class BackendClient {
                     val message = if (success) "Report submitted to zone: $zone" else "Server rejected report"
                     queuedRequest.callback(success, message)
                 }
-                "fetchReports" -> {
-                    val reports = parseReportsFromJson(responseBody)
-                    (queuedRequest.callback as (Boolean, List<Report>, String) -> Unit)(true, reports, "Success")
-                }
                 else -> {
+                    // For fetchReports and other requests, just pass the response body
+                    // The actual parsing is handled in the wrapped callback
                     queuedRequest.callback(true, responseBody)
                 }
             }
@@ -174,7 +275,6 @@ class BackendClient {
         }
         onComplete()
     }
-
     private fun handleRequestFailure(queuedRequest: QueuedRequest, errorMessage: String, onComplete: () -> Unit) {
         if (queuedRequest.retryCount < MAX_RETRIES) {
             // Retry with exponential backoff
@@ -225,17 +325,6 @@ class BackendClient {
         onComplete()
     }
 
-    fun testConnection(callback: (Boolean, String) -> Unit) {
-        val request = Request.Builder()
-            .url("$BACKEND_URL/health")
-            .get()
-            .build()
-
-        val queuedRequest = QueuedRequest(request, callback, 0, "testConnection")
-        requestQueue.offer(queuedRequest)
-        processRequestQueue()
-    }
-
     fun submitReport(
         latitude: Double,
         longitude: Double,
@@ -278,7 +367,7 @@ class BackendClient {
             callback(false, "Request creation failed: ${e.message}")
         }
     }
-    private val reportsCallbacks = mutableMapOf<String, (Boolean, List<Report>, String) -> Unit>()
+
 
     fun fetchAllReports(callback: (Boolean, List<Report>, String) -> Unit) {
         try {
@@ -289,18 +378,26 @@ class BackendClient {
                 .get()
                 .build()
 
-            // Generate unique request ID
-            val requestId = "fetchReports_${System.currentTimeMillis()}"
-
-            // Store the callback with the request ID
-            reportsCallbacks[requestId] = callback
-
-            // Simple callback that just passes the response body
-            val simpleCallback: (Boolean, String) -> Unit = { success, message ->
-                // The actual processing will happen in handleSuccessResponse
+            // Wrap the callback to match our QueuedRequest type
+            val wrappedCallback: (Boolean, String) -> Unit = { success, message ->
+                android.util.Log.d("BackendClient", "📥 Wrapped callback called: success=$success, message length=${message.length}")
+                if (success) {
+                    try {
+                        android.util.Log.d("BackendClient", "🔄 Starting to parse reports from JSON...")
+                        val reports = parseReportsFromJson(message)
+                        android.util.Log.d("BackendClient", "✅ Successfully parsed ${reports.size} reports, calling main callback")
+                        callback(success, reports, "Success")
+                    } catch (e: Exception) {
+                        android.util.Log.e("BackendClient", "❌ Failed to parse reports: ${e.message}")
+                        callback(false, emptyList(), "Failed to parse reports: ${e.message}")
+                    }
+                } else {
+                    android.util.Log.w("BackendClient", "⚠️ Request failed, calling callback with error: $message")
+                    callback(false, emptyList(), message)
+                }
             }
 
-            val queuedRequest = QueuedRequest(request, simpleCallback, 0, requestId)
+            val queuedRequest = QueuedRequest(request, wrappedCallback, 0, "fetchReports")
             requestQueue.offer(queuedRequest)
             processRequestQueue()
 
@@ -309,81 +406,6 @@ class BackendClient {
             callback(false, emptyList(), "Request creation failed: ${e.message}")
         }
     }
-
-    private fun parseReportsFromJson(responseBody: String): List<Report> {
-        val reports = mutableListOf<Report>()
-
-        try {
-            android.util.Log.d("BackendClient", "📋 Parsing response body: ${responseBody.take(200)}...")
-
-            val jsonResponse = JSONObject(responseBody)
-            val success = jsonResponse.optBoolean("success", false)
-
-            if (!success) {
-                android.util.Log.w("BackendClient", "⚠️ Server returned success=false")
-                return reports
-            }
-
-            val reportsArray = jsonResponse.optJSONArray("reports")
-            if (reportsArray == null) {
-                android.util.Log.w("BackendClient", "⚠️ No reports array in response")
-                return reports
-            }
-
-            android.util.Log.d("BackendClient", "📊 Processing ${reportsArray.length()} reports from server")
-
-            for (i in 0 until reportsArray.length()) {
-                try {
-                    val reportObj = reportsArray.getJSONObject(i)
-
-                    val id = reportObj.optString("id", UUID.randomUUID().toString())
-                    val lat = reportObj.optDouble("lat", 0.0)
-                    val lng = reportObj.optDouble("lng", 0.0)
-                    val content = reportObj.optString("content", "")
-                    val language = reportObj.optString("language", "en")
-                    val hasPhoto = reportObj.optBoolean("hasPhoto", false)
-                    val timestamp = reportObj.optLong("timestamp", System.currentTimeMillis())
-
-                    val categoryCode = reportObj.optString("category", "safety")
-                    val category = ReportCategory.values().find { it.code == categoryCode }
-                        ?: ReportCategory.SAFETY
-
-                    // Calculate expiration (8 hours from timestamp)
-                    val expiresAt = timestamp + (8 * 60 * 60 * 1000)
-
-                    // Only include non-expired reports
-                    if (expiresAt > System.currentTimeMillis()) {
-                        val report = Report(
-                            id = id,
-                            location = GeoPoint(lat, lng),
-                            originalText = content,
-                            originalLanguage = language,
-                            hasPhoto = hasPhoto,
-                            photo = null, // Photos are not downloaded, just indicated
-                            timestamp = timestamp,
-                            expiresAt = expiresAt,
-                            category = category
-                        )
-
-                        reports.add(report)
-                        android.util.Log.d("BackendClient", "📍 Parsed report: ${category.displayName} - ${content.take(30)}...")
-                    } else {
-                        android.util.Log.d("BackendClient", "⏰ Skipping expired report: $id")
-                    }
-
-                } catch (e: Exception) {
-                    android.util.Log.e("BackendClient", "❌ Error parsing individual report: ${e.message}")
-                    continue
-                }
-            }
-        } catch (e: Exception) {
-            android.util.Log.e("BackendClient", "❌ Error parsing reports array: ${e.message}")
-        }
-
-        android.util.Log.d("BackendClient", "✅ Successfully parsed ${reports.size} valid reports")
-        return reports
-    }
-
     fun subscribeToAlerts(
         latitude: Double,
         longitude: Double,

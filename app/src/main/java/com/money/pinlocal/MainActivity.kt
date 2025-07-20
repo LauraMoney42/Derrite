@@ -440,12 +440,6 @@ class MainActivity : AppCompatActivity(),
 
         // Show immediate feedback that report is being processed
         val isSpanish = preferencesManager.getSavedLanguage() == "es"
-        val processingMessage = if (isSpanish) {
-            "Enviando pin..."
-        } else {
-            "Sending pin..."
-        }
-        showStatusCard(processingMessage, isLoading = true)
 
         // Convert photo to base64 if present
         val photoBase64 = if (photo != null) {

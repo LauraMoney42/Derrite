@@ -1509,7 +1509,7 @@ class DialogManager(
         }
 
         val alarmSwitchLabel = TextView(context).apply {
-            text = if (isSpanish) "Alarma anula modo silencio" else "Alarm overrides silent mode"
+            text = if (isSpanish) "Alarma de SEGURIDAD anula modo silencio" else "SAFETY Alarm overrides silent mode"
             textSize = 14f
             setTextColor(Color.parseColor("#333333"))
             layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
@@ -1560,9 +1560,9 @@ class DialogManager(
         // Alarm description
         val alarmDescription = TextView(context).apply {
             text = if (isSpanish) {
-                "Cuando está activado, las alertas reproducirán un sonido fuerte incluso en modo silencio"
+                "Cuando está activado, las alertas de SEGURIDAD reproducirán un sonido fuerte incluso en modo silencio"
             } else {
-                "When enabled, alerts will play a loud sound even in silent mode"
+                "When enabled, SAFETY alerts will play a loud alarm sound even when in silent mode"
             }
             textSize = 12f
             setTextColor(Color.parseColor("#888888"))
