@@ -79,24 +79,109 @@ class LocationManager(private val context: Context) {
             fusedLocationClient.removeLocationUpdates(callback)
         }
     }
-
+    // File: managers/LocationManager.kt - DEBUG VERSION
     fun getLastLocation(callback: (Location?) -> Unit) {
         try {
             if (!hasLocationPermission()) {
+                android.util.Log.e("LocationManager", "❌ No location permission")
                 callback(null)
                 return
             }
 
+            android.util.Log.d("LocationManager", "🔍 Requesting last known location...")
+
             fusedLocationClient.lastLocation.addOnSuccessListener { location: Location? ->
-                currentLocation = location
-                callback(location)
-            }.addOnFailureListener {
+                if (location != null) {
+                    android.util.Log.d("LocationManager", "✅ Got cached location: ${location.latitude}, ${location.longitude}")
+                    android.util.Log.d("LocationManager", "📍 Location accuracy: ${location.accuracy}m")
+                    android.util.Log.d("LocationManager", "⏰ Location age: ${(System.currentTimeMillis() - location.time) / 1000}s")
+                    currentLocation = location
+                    callback(location)
+                } else {
+                    android.util.Log.w("LocationManager", "⚠️ No cached location available - requesting fresh location")
+                    // REQUEST FRESH LOCATION
+                    requestFreshLocation(callback)
+                }
+            }.addOnFailureListener { exception ->
+                android.util.Log.e("LocationManager", "❌ Failed to get last location: ${exception.message}")
                 callback(null)
             }
         } catch (e: SecurityException) {
+            android.util.Log.e("LocationManager", "❌ Security exception: ${e.message}")
             callback(null)
         }
     }
+
+    private fun requestFreshLocation(callback: (Location?) -> Unit) {
+        try {
+            android.util.Log.d("LocationManager", "🎯 Requesting fresh location...")
+
+            val locationRequest = LocationRequest.Builder(
+                Priority.PRIORITY_HIGH_ACCURACY,
+                5000  // 5 seconds
+            ).apply {
+                setMaxUpdates(1)  // Only need one location
+                setMinUpdateIntervalMillis(1000)
+            }.build()
+
+            val singleLocationCallback = object : LocationCallback() {
+                override fun onLocationResult(locationResult: LocationResult) {
+                    try {
+                        locationResult.lastLocation?.let { location ->
+                            android.util.Log.d("LocationManager", "✅ Got fresh location: ${location.latitude}, ${location.longitude}")
+                            currentLocation = location
+                            callback(location)
+                            // Remove this callback after getting location
+                            fusedLocationClient.removeLocationUpdates(this)
+                        } ?: run {
+                            android.util.Log.w("LocationManager", "⚠️ Fresh location result was null")
+                            callback(null)
+                        }
+                    } catch (e: Exception) {
+                        android.util.Log.e("LocationManager", "❌ Error processing fresh location: ${e.message}")
+                        callback(null)
+                    }
+                }
+            }
+
+            fusedLocationClient.requestLocationUpdates(
+                locationRequest,
+                singleLocationCallback,
+                Looper.getMainLooper()
+            )
+
+            // Timeout after 10 seconds
+            android.os.Handler(Looper.getMainLooper()).postDelayed({
+                android.util.Log.w("LocationManager", "⏰ Fresh location request timed out")
+                fusedLocationClient.removeLocationUpdates(singleLocationCallback)
+                callback(null)
+            }, 10000)
+
+        } catch (e: SecurityException) {
+            android.util.Log.e("LocationManager", "❌ Security exception in fresh location: ${e.message}")
+            callback(null)
+        } catch (e: Exception) {
+            android.util.Log.e("LocationManager", "❌ Error requesting fresh location: ${e.message}")
+            callback(null)
+        }
+    }
+//    fun getLastLocation(callback: (Location?) -> Unit) {
+//        try {
+//            if (!hasLocationPermission()) {
+//                callback(null)
+//                return
+//            }
+//
+//            fusedLocationClient.lastLocation.addOnSuccessListener { location: Location? ->
+//                currentLocation = location
+//                callback(location)
+//            }.addOnFailureListener {
+//                callback(null)
+//            }
+//        } catch (e: SecurityException) {
+//            callback(null)
+//        }
+//    }
 
     fun calculateDistance(lat1: Double, lng1: Double, lat2: Double, lng2: Double): Double {
         val earthRadius = 6371000.0

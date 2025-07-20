@@ -278,6 +278,7 @@ class BackendClient {
             callback(false, "Request creation failed: ${e.message}")
         }
     }
+    private val reportsCallbacks = mutableMapOf<String, (Boolean, List<Report>, String) -> Unit>()
 
     fun fetchAllReports(callback: (Boolean, List<Report>, String) -> Unit) {
         try {
@@ -288,21 +289,18 @@ class BackendClient {
                 .get()
                 .build()
 
-            // Wrap the callback to match our QueuedRequest type
-            val wrappedCallback: (Boolean, String) -> Unit = { success, message ->
-                if (success) {
-                    try {
-                        val reports = parseReportsFromJson(message)
-                        callback(success, reports, "Success")
-                    } catch (e: Exception) {
-                        callback(false, emptyList(), "Failed to parse reports: ${e.message}")
-                    }
-                } else {
-                    callback(false, emptyList(), message)
-                }
+            // Generate unique request ID
+            val requestId = "fetchReports_${System.currentTimeMillis()}"
+
+            // Store the callback with the request ID
+            reportsCallbacks[requestId] = callback
+
+            // Simple callback that just passes the response body
+            val simpleCallback: (Boolean, String) -> Unit = { success, message ->
+                // The actual processing will happen in handleSuccessResponse
             }
 
-            val queuedRequest = QueuedRequest(request, wrappedCallback, 0, "fetchReports")
+            val queuedRequest = QueuedRequest(request, simpleCallback, 0, requestId)
             requestQueue.offer(queuedRequest)
             processRequestQueue()
 

@@ -1,4 +1,4 @@
-// File: MainActivity.kt (Complete Updated Version with Duplicate Pin Prevention)
+// File: MainActivity.kt (Complete Updated Version with Enhanced Location Initialization)
 package com.money.pinlocal
 
 import android.Manifest
@@ -126,7 +126,7 @@ class MainActivity : AppCompatActivity(),
         alertManager.setAlertListener(this)
         favoriteManager.setFavoriteListener(this)
 
-        android.util.Log.d("MainActivity", "✅ All managers initialized with privacy-safe alert blocking")
+        android.util.Log.d("MainActivity", "All managers initialized with privacy-safe alert blocking")
     }
 
     private fun setupUI() {
@@ -143,107 +143,104 @@ class MainActivity : AppCompatActivity(),
     }
 
     private fun initializeApp() {
-        // Load saved data
+        android.util.Log.d("MainActivity", "Starting app initialization...")
+
+        // Load saved data first
         alertManager.loadViewedAlerts()
         reportManager.loadSavedReports()
         favoriteManager.loadSavedData()
 
+        // Start location updates immediately
+        locationManager.startLocationUpdates(this)
+        translationManager.initialize()
+
+        // Simple delayed auto-locate (like original)
+        Handler(Looper.getMainLooper()).postDelayed({
+            autoLocateOnStartup()
+        }, 1500) // Simple 1.5 second delay
+
+        // Start other services with delays
         Handler(Looper.getMainLooper()).postDelayed({
             try {
-                locationManager.startLocationUpdates(this)
-                translationManager.initialize()
-                autoLocateOnStartup()
                 startTimers()
                 startPeriodicReportSync()
-
-                // Subscribe to all saved favorites for background notifications
                 favoriteManager.subscribeToAllFavorites()
-
-                // FETCH ALL existing reports from server when location is available
-                Handler(Looper.getMainLooper()).postDelayed({
-                    fetchAllReportsInitially()
-                }, 3000) // Wait 3 seconds for location/map to be ready
-
                 scheduleInstructionOverlayAutoHide()
             } catch (e: Exception) {
                 android.util.Log.e("MainActivity", "Error in delayed initialization: ${e.message}")
             }
-        }, 1000)
+        }, 2000)
+
+        // Fetch reports much later to avoid conflicts
+        Handler(Looper.getMainLooper()).postDelayed({
+            fetchAllReportsInitially()
+        }, 5000) // Reduced from 8 seconds
     }
 
-    // DEBUG METHOD - Add this to see what's on the map
-    private fun debugMapContents() {
-        try {
-            android.util.Log.d("MainActivity", "=== MAP DEBUG INFO ===")
-            android.util.Log.d("MainActivity", "MapView initialized: ${::mapView.isInitialized}")
-            if (::mapView.isInitialized) {
-                android.util.Log.d("MainActivity", "MapView repository null: ${mapView.repository == null}")
-                android.util.Log.d("MainActivity", "MapView overlays count: ${mapView.overlays.size}")
+    private fun autoLocateOnStartup() {
+        val isLanguageChange = preferencesManager.isLanguageChange()
+        android.util.Log.d("MainActivity", "Auto-locating on startup")
 
-                mapView.overlays.forEachIndexed { index, overlay ->
-                    when (overlay) {
-                        is org.osmdroid.views.overlay.Marker -> {
-                            android.util.Log.d("MainActivity", "  Overlay $index: Marker '${overlay.title}' at ${overlay.position}")
-                        }
-                        is org.osmdroid.views.overlay.Polygon -> {
-                            android.util.Log.d("MainActivity", "  Overlay $index: Polygon (report circle)")
-                        }
-                        else -> {
-                            android.util.Log.d("MainActivity", "  Overlay $index: ${overlay::class.java.simpleName}")
-                        }
-                    }
-                }
+        if (locationManager.hasLocationPermission()) {
+            if (!isLanguageChange) {
+                val message = if (preferencesManager.getSavedLanguage() == "es")
+                    "Encontrando tu ubicación..." else "Finding your location..."
+                showStatusCard(message, isLoading = true)
             }
-
-            // Also log local reports
-            val localReports = reportManager.getActiveReports()
-            android.util.Log.d("MainActivity", "Local reports in ReportManager: ${localReports.size}")
-            localReports.forEach { report ->
-                android.util.Log.d("MainActivity", "  Local: ${report.id} - ${report.category.name} - ${report.originalText.take(20)}...")
-            }
-
-            android.util.Log.d("MainActivity", "Reports on map: ${mapManager.getReportCountOnMap()}")
-            android.util.Log.d("MainActivity", "=== END MAP DEBUG ===")
-        } catch (e: Exception) {
-            android.util.Log.e("MainActivity", "Error in debugMapContents: ${e.message}")
+            getCurrentLocationSilently(isStartup = true)
+        } else {
+            val message = if (preferencesManager.getSavedLanguage() == "es")
+                "Solicitando permiso de ubicación..." else "Requesting location permission..."
+            showStatusCard(message, isLoading = true)
+            requestLocationPermission()
         }
+
+        if (isLanguageChange) {
+            preferencesManager.setLanguageChange(false)
+        }
+
+        // Check for alerts after location should be set
+        Handler(Looper.getMainLooper()).postDelayed({
+            locationManager.getCurrentLocation()?.let { location ->
+                alertManager.checkForNewAlerts(location)
+            }
+        }, 3000)
     }
 
-    // IMPROVED: Use the new refresh method to prevent duplicates
     private fun fetchAllReportsInitially() {
         val isSpanish = preferencesManager.getSavedLanguage() == "es"
         val fetchMessage = if (isSpanish) "Cargando todos los reportes..." else "Loading all reports..."
         showStatusCard(fetchMessage, isLoading = true)
 
-        android.util.Log.d("MainActivity", "🚀 INITIAL FETCH - Starting...")
+        android.util.Log.d("MainActivity", "INITIAL FETCH - Starting...")
 
         // Fetch ALL reports globally
         backendClient.fetchAllReports { success: Boolean, reports: List<Report>, message: String ->
             runOnUiThread {
-                android.util.Log.d("MainActivity", "🚀 INITIAL FETCH - Result: success=$success, reports=${reports.size}")
+                android.util.Log.d("MainActivity", "INITIAL FETCH - Result: success=$success, reports=${reports.size}")
 
                 if (success && reports.isNotEmpty()) {
-                    android.util.Log.d("MainActivity", "🚀 INITIAL FETCH - Processing ${reports.size} reports")
+                    android.util.Log.d("MainActivity", "INITIAL FETCH - Processing ${reports.size} reports")
 
                     // IMPROVED: Use the new refresh method to prevent duplicates
                     val validReports = mutableListOf<Report>()
 
                     reports.forEach { report ->
                         try {
-                            android.util.Log.d("MainActivity", "🚀 Adding initial report: ${report.id} - ${report.category.name}")
+                            android.util.Log.d("MainActivity", "Adding initial report: ${report.id} - ${report.category.name}")
                             reportManager.addReport(report)
                             validReports.add(report)
                         } catch (e: Exception) {
-                            android.util.Log.e("MainActivity", "🚀 Error processing initial report ${report.id}: ${e.message}")
+                            android.util.Log.e("MainActivity", "Error processing initial report ${report.id}: ${e.message}")
                         }
                     }
 
                     // Use the new refresh method to add all reports safely
                     if (::mapView.isInitialized && mapView.repository != null) {
                         mapManager.refreshReportsOnMap(mapView, validReports, this)
-                        android.util.Log.d("MainActivity", "🚀 Refreshed map with ${validReports.size} reports")
+                        android.util.Log.d("MainActivity", "Refreshed map with ${validReports.size} reports")
                     } else {
-                        android.util.Log.e("MainActivity", "🚀 MapView not ready for initial reports")
+                        android.util.Log.e("MainActivity", "MapView not ready for initial reports")
                     }
 
                     val successMessage = if (isSpanish)
@@ -255,7 +252,7 @@ class MainActivity : AppCompatActivity(),
                     // Check for alerts after initial reports are loaded
                     val currentLocation = locationManager.getCurrentLocation()
                     if (currentLocation != null) {
-                        android.util.Log.d("MainActivity", "🚨 Checking for alerts after initial report load")
+                        android.util.Log.d("MainActivity", "Checking for alerts after initial report load")
                         alertManager.checkForNewAlerts(currentLocation)
                         favoriteManager.checkForFavoriteAlerts()
                     }
@@ -263,7 +260,7 @@ class MainActivity : AppCompatActivity(),
                     Handler(Looper.getMainLooper()).postDelayed({ hideStatusCard() }, 3000)
 
                 } else if (success && reports.isEmpty()) {
-                    android.util.Log.d("MainActivity", "🚀 INITIAL FETCH - No reports found")
+                    android.util.Log.d("MainActivity", "INITIAL FETCH - No reports found")
                     val noReportsMessage = if (isSpanish)
                         "No hay reportes activos"
                     else
@@ -272,7 +269,7 @@ class MainActivity : AppCompatActivity(),
                     Handler(Looper.getMainLooper()).postDelayed({ hideStatusCard() }, 2000)
 
                 } else {
-                    android.util.Log.e("MainActivity", "🚀 INITIAL FETCH - Failed: $message")
+                    android.util.Log.e("MainActivity", "INITIAL FETCH - Failed: $message")
                     val errorMessage = if (isSpanish)
                         "Error cargando reportes"
                     else
@@ -290,7 +287,7 @@ class MainActivity : AppCompatActivity(),
         val timeSinceLastSilentFetch = now - (preferencesManager.preferences.getLong("last_silent_fetch", 0))
 
         if (timeSinceLastSilentFetch < 30000) { // Don't fetch more than once every 30 seconds
-            android.util.Log.d("MainActivity", "🚫 Throttling silent fetch - too recent")
+            android.util.Log.d("MainActivity", "Throttling silent fetch - too recent")
             onComplete(true)
             return
         }
@@ -302,7 +299,7 @@ class MainActivity : AppCompatActivity(),
             runOnUiThread {
                 try {
                     if (success && reports.isNotEmpty()) {
-                        android.util.Log.d("MainActivity", "📡 SILENT FETCH - Processing ${reports.size} server reports")
+                        android.util.Log.d("MainActivity", "SILENT FETCH - Processing ${reports.size} server reports")
 
                         var newReportsCount = 0
                         var skippedReportsCount = 0
@@ -312,21 +309,21 @@ class MainActivity : AppCompatActivity(),
                         val existingReportIds = reportManager.getActiveReports().map { it.id }.toSet()
 
                         reports.forEach { serverReport ->
-                            android.util.Log.d("MainActivity", "📡 Processing server report: ${serverReport.id}")
+                            android.util.Log.d("MainActivity", "Processing server report: ${serverReport.id}")
 
                             if (!existingReportIds.contains(serverReport.id)) {
                                 // IMPROVED: Check if already on map as well
                                 if (!mapManager.isReportOnMap(serverReport.id)) {
-                                    android.util.Log.d("MainActivity", "  ➕ NEW report found: ${serverReport.id}")
+                                    android.util.Log.d("MainActivity", "NEW report found: ${serverReport.id}")
                                     reportManager.addReport(serverReport)
                                     newReports.add(serverReport)
                                     newReportsCount++
                                 } else {
-                                    android.util.Log.d("MainActivity", "  ⏭️ SKIPPED - Already on map: ${serverReport.id}")
+                                    android.util.Log.d("MainActivity", "SKIPPED - Already on map: ${serverReport.id}")
                                     skippedReportsCount++
                                 }
                             } else {
-                                android.util.Log.d("MainActivity", "  ⏭️ SKIPPED - Already exists locally: ${serverReport.id}")
+                                android.util.Log.d("MainActivity", "SKIPPED - Already exists locally: ${serverReport.id}")
                                 skippedReportsCount++
                             }
                         }
@@ -349,7 +346,7 @@ class MainActivity : AppCompatActivity(),
                                 // Check for alerts only when NEW reports are added
                                 val currentLocation = locationManager.getCurrentLocation()
                                 if (currentLocation != null) {
-                                    android.util.Log.d("MainActivity", "🚨 Checking for alerts due to $newReportsCount new server reports")
+                                    android.util.Log.d("MainActivity", "Checking for alerts due to $newReportsCount new server reports")
                                     alertManager.checkForNewAlerts(currentLocation)
                                     favoriteManager.checkForFavoriteAlerts()
                                 }
@@ -360,7 +357,7 @@ class MainActivity : AppCompatActivity(),
 
                         onComplete(true)
                     } else if (!success && message.contains("Rate limit", ignoreCase = true)) {
-                        android.util.Log.w("MainActivity", "🚫 Silent fetch rate limited: $message")
+                        android.util.Log.w("MainActivity", "Silent fetch rate limited: $message")
                         onComplete(false) // Don't retry immediately
                     } else {
                         android.util.Log.w("MainActivity", "Silent fetch: no reports or failed: $message")
@@ -377,12 +374,12 @@ class MainActivity : AppCompatActivity(),
     // IMPROVED: Clean up expired reports with proper map cleanup
     private fun cleanupExpiredReports() {
         try {
-            android.util.Log.d("MainActivity", "🧹 Starting cleanup of expired reports")
+            android.util.Log.d("MainActivity", "Starting cleanup of expired reports")
 
             val expiredReports = reportManager.cleanupExpiredReports()
 
             if (expiredReports.isNotEmpty()) {
-                android.util.Log.d("MainActivity", "🗑️ Found ${expiredReports.size} expired reports to remove")
+                android.util.Log.d("MainActivity", "Found ${expiredReports.size} expired reports to remove")
 
                 // Remove from map
                 if (::mapView.isInitialized && mapView.repository != null) {
@@ -396,9 +393,9 @@ class MainActivity : AppCompatActivity(),
                 alertManager.removeAlertsForExpiredReports(expiredReports)
                 favoriteManager.removeAlertsForExpiredReports(expiredReports)
 
-                android.util.Log.d("MainActivity", "✅ Cleanup completed for ${expiredReports.size} expired reports")
+                android.util.Log.d("MainActivity", "Cleanup completed for ${expiredReports.size} expired reports")
             } else {
-                android.util.Log.d("MainActivity", "✅ No expired reports to clean up")
+                android.util.Log.d("MainActivity", "No expired reports to clean up")
             }
         } catch (e: Exception) {
             android.util.Log.e("MainActivity", "Error during cleanup: ${e.message}")
@@ -408,14 +405,14 @@ class MainActivity : AppCompatActivity(),
     // NEW: Method to force refresh all reports on map (useful for debugging)
     private fun forceRefreshMap() {
         try {
-            android.util.Log.d("MainActivity", "🔄 Force refreshing entire map")
+            android.util.Log.d("MainActivity", "Force refreshing entire map")
 
             if (::mapView.isInitialized && mapView.repository != null) {
                 val allReports = reportManager.getActiveReports()
                 mapManager.refreshReportsOnMap(mapView, allReports, this)
 
-                android.util.Log.d("MainActivity", "✅ Force refresh completed with ${allReports.size} reports")
-                android.util.Log.d("MainActivity", "📊 Reports on map: ${mapManager.getReportCountOnMap()}")
+                android.util.Log.d("MainActivity", "Force refresh completed with ${allReports.size} reports")
+                android.util.Log.d("MainActivity", "Reports on map: ${mapManager.getReportCountOnMap()}")
             }
         } catch (e: Exception) {
             android.util.Log.e("MainActivity", "Error during force refresh: ${e.message}")
@@ -423,20 +420,20 @@ class MainActivity : AppCompatActivity(),
     }
 
     private fun createReport(location: GeoPoint, text: String, photo: Bitmap?, category: ReportCategory) {
-        android.util.Log.d("MainActivity", "🆕 CREATING REPORT - Starting alert cooldown period")
+        android.util.Log.d("MainActivity", "CREATING REPORT - Starting alert cooldown period")
 
         val detectedLanguage = translationManager.detectLanguage(text)
         val report = reportManager.createReport(location, text, detectedLanguage, photo, category)
 
-        android.util.Log.d("MainActivity", "✅ Report created with ID: ${report.id}")
-        android.util.Log.d("MainActivity", "⏰ Alert checking will be blocked for 60 seconds")
+        android.util.Log.d("MainActivity", "Report created with ID: ${report.id}")
+        android.util.Log.d("MainActivity", "Alert checking will be blocked for 60 seconds")
 
         // IMPROVED: Check for duplicates before adding to map
         if (!mapManager.isReportOnMap(report.id)) {
             mapManager.addReportToMap(mapView, report, this)
-            android.util.Log.d("MainActivity", "✅ Added new user report ${report.id} to map")
+            android.util.Log.d("MainActivity", "Added new user report ${report.id} to map")
         } else {
-            android.util.Log.w("MainActivity", "⚠️ User report ${report.id} already exists on map")
+            android.util.Log.w("MainActivity", "User report ${report.id} already exists on map")
         }
 
         preferencesManager.setUserHasCreatedReports(true)
@@ -483,7 +480,7 @@ class MainActivity : AppCompatActivity(),
         ) { success: Boolean, message: String ->
             runOnUiThread {
                 if (success) {
-                    android.util.Log.d("MainActivity", "📤 Report successfully submitted to server")
+                    android.util.Log.d("MainActivity", "Report successfully submitted to server")
                     subscribeToAlertsForLocation(location.latitude, location.longitude)
 
                     val successMessage = if (isSpanish) {
@@ -494,7 +491,7 @@ class MainActivity : AppCompatActivity(),
                     showStatusCard(successMessage, isLoading = false)
                     Handler(Looper.getMainLooper()).postDelayed({ hideStatusCard() }, 3000)
                 } else {
-                    android.util.Log.e("MainActivity", "❌ Failed to submit report: $message")
+                    android.util.Log.e("MainActivity", "Failed to submit report: $message")
 
                     // Enhanced error messages for different failure types
                     val errorMessage = when {
@@ -578,12 +575,11 @@ class MainActivity : AppCompatActivity(),
         }
     }
 
-
     // Alert callbacks remain the same - no additional filtering needed
     override fun onNewAlerts(alerts: List<Alert>) {
-        android.util.Log.d("MainActivity", "🚨 NEW ALERTS DETECTED: ${alerts.size} alerts")
+        android.util.Log.d("MainActivity", "NEW ALERTS DETECTED: ${alerts.size} alerts")
         alerts.forEach { alert ->
-            android.util.Log.d("MainActivity", "  - Alert: ${alert.report.category} - ${alert.report.originalText.take(30)}")
+            android.util.Log.d("MainActivity", "Alert: ${alert.report.category} - ${alert.report.originalText.take(30)}")
         }
 
         val message = alertManager.getAlertSummaryMessage(
@@ -605,7 +601,7 @@ class MainActivity : AppCompatActivity(),
     }
 
     override fun onNewFavoriteAlerts(alerts: List<FavoriteAlert>) {
-        android.util.Log.d("MainActivity", "🚨 NEW FAVORITE ALERTS: ${alerts.size} alerts")
+        android.util.Log.d("MainActivity", "NEW FAVORITE ALERTS: ${alerts.size} alerts")
 
         val message = favoriteManager.getFavoriteAlertSummaryMessage(
             alerts,
@@ -730,19 +726,50 @@ class MainActivity : AppCompatActivity(),
     }
 
     private fun setupMap() {
+        android.util.Log.d("MainActivity", "Setting up map...")
+
         mapManager.setupMap(mapView, packageName)
         mapManager.setupMapLongPressListener(mapView, this)
 
+        android.util.Log.d("MainActivity", "Map setup completed, repository status: ${mapView.repository != null}")
+
+        // IMPROVED: Check map repository status and add delayed loading
         Handler(Looper.getMainLooper()).postDelayed({
             try {
+                android.util.Log.d("MainActivity", "Delayed map check - Repository ready: ${mapView.repository != null}")
+
                 if (::mapView.isInitialized && mapView.repository != null) {
-                    reportManager.getActiveReports().forEach { report ->
+                    android.util.Log.d("MainActivity", "Map repository is ready, loading existing items")
+
+                    val reports = reportManager.getActiveReports()
+                    android.util.Log.d("MainActivity", "Loading ${reports.size} existing reports")
+                    reports.forEach { report ->
                         mapManager.addReportToMap(mapView, report, this)
                     }
 
-                    favoriteManager.getFavorites().forEach { favorite ->
+                    val favorites = favoriteManager.getFavorites()
+                    android.util.Log.d("MainActivity", "Loading ${favorites.size} existing favorites")
+                    favorites.forEach { favorite ->
                         mapManager.addFavoriteToMap(mapView, favorite, this)
                     }
+
+                    android.util.Log.d("MainActivity", "All existing items loaded on map")
+                } else {
+                    android.util.Log.w("MainActivity", "Map repository not ready after 3 seconds, will retry")
+                    // Retry once more
+                    Handler(Looper.getMainLooper()).postDelayed({
+                        if (::mapView.isInitialized && mapView.repository != null) {
+                            android.util.Log.d("MainActivity", "Map repository ready on retry")
+                            reportManager.getActiveReports().forEach { report ->
+                                mapManager.addReportToMap(mapView, report, this)
+                            }
+                            favoriteManager.getFavorites().forEach { favorite ->
+                                mapManager.addFavoriteToMap(mapView, favorite, this)
+                            }
+                        } else {
+                            android.util.Log.e("MainActivity", "Map repository still not ready after retry")
+                        }
+                    }, 2000)
                 }
             } catch (e: Exception) {
                 android.util.Log.e("MainActivity", "Error loading existing items on map: ${e.message}")
@@ -1090,45 +1117,37 @@ class MainActivity : AppCompatActivity(),
         }
     }
 
-    private fun autoLocateOnStartup() {
-        val isLanguageChange = preferencesManager.isLanguageChange()
-
-        if (locationManager.hasLocationPermission()) {
-            if (!isLanguageChange) {
-                val message = if (preferencesManager.getSavedLanguage() == "es")
-                    "Encontrando tu ubicación..." else "Finding your location..."
-                showStatusCard(message, isLoading = true)
-            }
-            getCurrentLocationSilently(isStartup = true)
-        } else {
-            val message = if (preferencesManager.getSavedLanguage() == "es")
-                "Solicitando permiso de ubicación..." else "Requesting location permission..."
-            showStatusCard(message, isLoading = true)
-            requestLocationPermission()
-        }
-
-        if (isLanguageChange) {
-            preferencesManager.setLanguageChange(false)
-        }
-
-        Handler(Looper.getMainLooper()).postDelayed({
-            locationManager.getCurrentLocation()?.let { location ->
-                alertManager.checkForNewAlerts(location)
-            }
-        }, 2000)
-    }
-
     private fun getCurrentLocationSilently(isStartup: Boolean = false) {
+        android.util.Log.d("MainActivity", "🗺️ getCurrentLocationSilently called with isStartup: $isStartup")
+        android.util.Log.d("MainActivity", "🗺️ hasInitialLocationSet: $hasInitialLocationSet")
+
         locationManager.getLastLocation { location: Location? ->
             if (location != null) {
                 val userLocation = GeoPoint(location.latitude, location.longitude)
+                android.util.Log.d("MainActivity", "🗺️ Got location: ${userLocation.latitude}, ${userLocation.longitude}")
 
                 if (isStartup && !hasInitialLocationSet) {
                     mapView.controller.setCenter(userLocation)
                     mapView.controller.setZoom(18.0)
+                    mapView.controller.setCenter(userLocation)
+                    mapView.controller.setZoom(18.0)
+
+// FORCE REFRESH
+                    mapView.invalidate()
+
+// CHECK AGAIN AFTER REFRESH
+                    Handler(Looper.getMainLooper()).postDelayed({
+                        android.util.Log.d("MainActivity", "🔍 After refresh - center: ${mapView.mapCenter}")
+                        android.util.Log.d("MainActivity", "🔍 After refresh - zoom: ${mapView.zoomLevelDouble}")
+                    }, 500)
+                    android.util.Log.d("MainActivity", "🗺️ Map center set to: ${userLocation.latitude}, ${userLocation.longitude}")
+                    android.util.Log.d("MainActivity", "🗺️ Map zoom set to: 18.0")
+
                     mapManager.addLocationMarker(mapView, userLocation)
                     hasInitialLocationSet = true
-                    hideStatusCard()
+
+                    android.util.Log.d("MainActivity", "🗺️ hasInitialLocationSet now: $hasInitialLocationSet")
+                    // Check for alerts and subscribe
                     alertManager.checkForNewAlerts(location)
                     subscribeToAlertsForLocation(location.latitude, location.longitude)
 
@@ -1161,6 +1180,61 @@ class MainActivity : AppCompatActivity(),
         }
     }
 
+
+    // ENHANCED: More robust initial location setting
+    private fun setInitialMapLocation(userLocation: GeoPoint) {
+        try {
+            android.util.Log.d("MainActivity", "Setting initial map location: ${userLocation.latitude}, ${userLocation.longitude}")
+            android.util.Log.d("MainActivity", "Map state - initialized: ${::mapView.isInitialized}, repository: ${mapView.repository != null}")
+
+            // Double-check map state
+            if (!::mapView.isInitialized) {
+                android.util.Log.e("MainActivity", "MapView not initialized!")
+                throw Exception("MapView not initialized")
+            }
+
+            if (mapView.repository == null) {
+                android.util.Log.e("MainActivity", "MapView repository is null!")
+                throw Exception("MapView repository is null")
+            }
+
+            // Set the location
+            mapView.controller.setCenter(userLocation)
+            mapView.controller.setZoom(18.0)
+            mapManager.addLocationMarker(mapView, userLocation)
+            hasInitialLocationSet = true
+
+            android.util.Log.d("MainActivity", "Map location set successfully")
+            hideStatusCard()
+
+            // Check for alerts and subscribe after location is set
+            val location = android.location.Location("").apply {
+                latitude = userLocation.latitude
+                longitude = userLocation.longitude
+            }
+            alertManager.checkForNewAlerts(location)
+            subscribeToAlertsForLocation(userLocation.latitude, userLocation.longitude)
+
+            // Force map refresh
+            Handler(Looper.getMainLooper()).postDelayed({
+                try {
+                    mapView.invalidate()
+                    mapView.requestLayout()
+                    android.util.Log.d("MainActivity", "Initial location set successfully - map refreshed")
+                } catch (e: Exception) {
+                    android.util.Log.e("MainActivity", "Error refreshing map after location set: ${e.message}")
+                }
+            }, 500)
+
+        } catch (e: Exception) {
+            android.util.Log.e("MainActivity", "Error setting initial map location: ${e.message}")
+            hideStatusCard()
+
+            // Don't retry forever - just log the failure
+            android.util.Log.e("MainActivity", "Failed to set initial location, giving up")
+        }
+    }
+
     private fun subscribeToAlertsForLocation(latitude: Double, longitude: Double) {
         backendClient.subscribeToAlerts(latitude, longitude) { success: Boolean, message: String ->
             // Silent subscription
@@ -1178,6 +1252,8 @@ class MainActivity : AppCompatActivity(),
     }
 
     private fun requestLocationPermission() {
+        android.util.Log.d("MainActivity", "Requesting location permission")
+
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
             ActivityCompat.requestPermissions(
                 this,
@@ -1185,6 +1261,7 @@ class MainActivity : AppCompatActivity(),
                 LOCATION_PERMISSION_REQUEST
             )
         } else {
+            android.util.Log.w("MainActivity", "Pre-M device, should have location permission")
             val message = if (preferencesManager.getSavedLanguage() == "es")
                 "Se necesita permiso de ubicación" else "Location permission needed"
             showStatusCard(message, isError = true)
@@ -1269,11 +1346,13 @@ class MainActivity : AppCompatActivity(),
                     val message = if (preferencesManager.getSavedLanguage() == "es")
                         "Se requiere permiso de ubicación" else "Location permission required"
                     showStatusCard(message, isError = true)
+                    Handler(Looper.getMainLooper()).postDelayed({ hideStatusCard() }, 3000)
                 }
             }
         }
         photoManager.handlePermissionResult(requestCode, grantResults)
     }
+
 
     override fun onDestroy() {
         super.onDestroy()
@@ -1293,15 +1372,10 @@ class MainActivity : AppCompatActivity(),
             mapView.onResume()
             isAppInForeground = true
 
-            // Debug what's currently on the map
-            debugMapContents()
-
             // Sync once when returning to foreground
             Handler(Looper.getMainLooper()).postDelayed({
                 silentFetchReports { success ->
                     android.util.Log.d("MainActivity", "Resume sync completed: $success")
-                    // Debug again after sync
-                    debugMapContents()
                 }
             }, 1000)
 
