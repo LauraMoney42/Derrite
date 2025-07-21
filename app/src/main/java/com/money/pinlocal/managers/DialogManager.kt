@@ -146,8 +146,23 @@ class DialogManager(
         dialogLayout.addView(categoryLabel)
 
         val categorySpinner = android.widget.Spinner(context).apply {
-            setPadding(16, 12, 16, 12)
-            setBackgroundColor(Color.parseColor("#F5F5F5"))
+            setPadding(16, 12, 40, 12)
+
+            // Create custom background with arrow icon
+            val backgroundDrawable = android.graphics.drawable.LayerDrawable(arrayOf(
+                android.graphics.drawable.GradientDrawable().apply {
+                    setColor(Color.parseColor("#F5F5F5"))
+                    cornerRadius = 8f
+                },
+                ContextCompat.getDrawable(context, R.drawable.ic_dropdown_arrow)
+            ))
+
+            // Position arrow on the right
+            backgroundDrawable.setLayerInset(1, 0, 0, 16, 0)
+            backgroundDrawable.setLayerGravity(1, android.view.Gravity.END or android.view.Gravity.CENTER_VERTICAL)
+
+            background = backgroundDrawable
+
             layoutParams = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
                 LinearLayout.LayoutParams.WRAP_CONTENT
