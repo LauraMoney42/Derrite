@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <!-- App Name -->
-    <string name="app_name">PinLocal</string>
+    <string name="app_name">Derrite</string>
 
     <!-- Navigation -->
     <string name="language_toggle">Español</string>
@@ -66,7 +66,7 @@
     <string name="version">Version</string>
     <string name="notifications">Notifications</string>
     <string name="nearby_reports">Nearby Pins</string>
-    <string name="about_description">PinLocal helps communities stay informed through anonymous pinning</string>
+    <string name="about_description">Derrite helps communities stay informed through anonymous pinning</string>
     <string name="privacy">Privacy</string>
     <string name="privacy_description">Your privacy is protected with anonymous pinning</string>
 

@@ -6,11 +6,11 @@ plugins {
 }
 
 android {
-    namespace = "com.money.pinlocal"
+    namespace = "com.money.derrite"
     compileSdk = 35
 
     defaultConfig {
-        applicationId = "com.money.pinlocal"
+        applicationId = "com.money.derrite"
         minSdk = 21
         targetSdk = 35
         versionCode = 1

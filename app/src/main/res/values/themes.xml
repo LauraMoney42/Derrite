@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources xmlns:tools="http://schemas.android.com/tools">
     <!-- iOS-Inspired Theme -->
-    <style name="Theme.pinlocal" parent="Theme.Material3.DayNight.NoActionBar">
+    <style name="Theme.derrite" parent="Theme.Material3.DayNight.NoActionBar">
         <!-- Primary colors (Red for safety only) -->
         <item name="colorPrimary">@color/primary</item>
         <item name="colorOnPrimary">@color/white</item>
@@ -48,7 +48,7 @@
     </style>
 
     <!-- NoActionBar variant (same as main theme) -->
-    <style name="Theme.pinlocal.NoActionBar" parent="Theme.pinlocal" />
+    <style name="Theme.derrite.NoActionBar" parent="Theme.derrite" />
 
     <!-- iOS-Style Card -->
     <style name="iOSCardStyle" parent="Widget.Material3.CardView.Elevated">

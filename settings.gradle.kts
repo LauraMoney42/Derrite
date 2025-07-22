@@ -19,5 +19,5 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "PinLocal"
+rootProject.name = "Derrite"
 include(":app")

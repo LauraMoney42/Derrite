@@ -8,10 +8,10 @@
             <InsightsFilterSettings>
               <option name="connection">
                 <ConnectionSetting>
-                  <option name="appId" value="com.money.pinlocal" />
-                  <option name="mobileSdkAppId" value="1:260537097056:android:eeada055b58c0995775c05" />
-                  <option name="projectId" value="mibackend-2f3f3" />
-                  <option name="projectNumber" value="260537097056" />
+                  <option name="appId" value="PLACEHOLDER" />
+                  <option name="mobileSdkAppId" value="" />
+                  <option name="projectId" value="" />
+                  <option name="projectNumber" value="" />
                 </ConnectionSetting>
               </option>
               <option name="signal" value="SIGNAL_UNSPECIFIED" />

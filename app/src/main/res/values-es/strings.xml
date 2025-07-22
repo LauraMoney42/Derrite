@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <!-- App Name -->
-    <string name="app_name">PinLocal</string>
+    <string name="app_name">Derrite</string>
 
     <!-- Navigation -->
     <string name="language_toggle">English</string>
@@ -68,7 +68,7 @@
     <string name="version">Versión</string>
     <string name="notifications">Notificaciones</string>
     <string name="nearby_reports">Pines Cercanos</string>
-    <string name="about_description">PinLocal ayuda a las comunidades a mantenerse informadas a través de pines anónimos</string>
+    <string name="about_description">Derrite ayuda a las comunidades a mantenerse informadas a través de pines anónimos</string>
     <string name="privacy">Privacidad</string>
     <string name="privacy_description">Tu privacidad está protegida con pines anónimos</string>
 

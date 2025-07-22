@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <style name="Theme.pinlocal" parent="Theme.Material3.Light.NoActionBar">
+    <style name="Theme.Derrite" parent="Theme.Material3.Light.NoActionBar">
         <!-- All the same items as base theme -->
         <item name="colorPrimary">@color/accent</item>
         <item name="colorOnPrimary">@color/white</item>
