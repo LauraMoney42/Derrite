@@ -16,18 +16,6 @@
         android:gravity="center"
         android:layout_marginBottom="16dp" />
 
-    <TextView
-        android:id="@+id/category_display"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:text="⚠️ Safety"
-        android:textColor="@color/category_safety"
-        android:textSize="16sp"
-        android:gravity="center"
-        android:padding="12dp"
-        android:background="@color/surface_variant"
-        android:layout_marginBottom="16dp" />
-
     <com.google.android.material.textfield.TextInputEditText
         android:id="@+id/edit_report_text"
         android:layout_width="match_parent"
@@ -45,13 +33,6 @@
         android:orientation="horizontal"
         android:gravity="center"
         android:layout_marginBottom="16dp">
-
-        <Button
-            android:id="@+id/btn_select_category"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="Change Category"
-            android:layout_marginEnd="8dp" />
 
         <Button
             android:id="@+id/btn_add_photo"
@@ -79,7 +60,7 @@
             android:id="@+id/btn_submit"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="Submit Pin"
+            android:text="Submit Report"
             android:backgroundTint="@color/primary" />
 
     </LinearLayout>
