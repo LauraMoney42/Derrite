@@ -973,7 +973,7 @@ class MainActivity : AppCompatActivity(),
 
     private fun setupLocationButton() {
         fabLocation.backgroundTintList = android.content.res.ColorStateList.valueOf(
-            Color.parseColor("#8E8E93")
+            ContextCompat.getColor(this, R.color.fab_background)
         )
 
         fabLocation.imageTintList = android.content.res.ColorStateList.valueOf(Color.WHITE)

@@ -1,20 +1,20 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
 
-    <!-- White Card Style - Forces white background regardless of theme -->
+    <!-- Dark Card Style - Now uses dark background instead of white -->
     <style name="WhiteCardStyle" parent="Widget.Material3.CardView.Elevated">
-        <item name="cardBackgroundColor">#FFFFFF</item>
-        <item name="android:background">#FFFFFF</item>
-        <item name="strokeColor">#E0E0E0</item>
+        <item name="cardBackgroundColor">@color/surface</item>
+        <item name="android:background">@color/surface</item>
+        <item name="strokeColor">@color/border_color</item>
         <item name="strokeWidth">1dp</item>
     </style>
 
-    <!-- Dialog Style - Force dark colors -->
+    <!-- Dialog Style - Updated for dark theme -->
     <style name="DialogStyle" parent="Theme.Material3.DayNight.Dialog">
-        <item name="android:windowBackground">#FF000000</item>
-        <item name="android:textColor">#FFFFFFFF</item>
-        <item name="colorSurface">#FF000000</item>
-        <item name="colorOnSurface">#FFFFFFFF</item>
+        <item name="android:windowBackground">@color/surface</item>
+        <item name="android:textColor">@color/text_primary</item>
+        <item name="colorSurface">@color/surface</item>
+        <item name="colorOnSurface">@color/text_primary</item>
     </style>
 
 </resources>

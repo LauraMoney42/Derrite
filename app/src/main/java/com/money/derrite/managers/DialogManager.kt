@@ -325,7 +325,7 @@ class DialogManager(
         val dialogLayout = LinearLayout(context).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(32, 32, 32, 32)
-            setBackgroundColor(Color.WHITE)
+            setBackgroundColor(ContextCompat.getColor(context, R.color.surface))
             background = ContextCompat.getDrawable(context, R.drawable.white_card_background)
         }
 
@@ -349,9 +349,9 @@ class DialogManager(
                         "Type: Safety"
             }
             textSize = 14f
-            setTextColor(Color.parseColor("#333333"))
+            setTextColor(ContextCompat.getColor(context, R.color.text_primary))
             setPadding(16, 16, 16, 24)
-            setBackgroundColor(Color.parseColor("#F5F5F5"))
+            setBackgroundColor(ContextCompat.getColor(context, R.color.surface_variant))
             layoutParams = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
                 LinearLayout.LayoutParams.WRAP_CONTENT

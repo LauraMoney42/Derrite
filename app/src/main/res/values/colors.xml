@@ -1,69 +1,69 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <!-- iOS-Inspired Color Scheme -->
-    <color name="primary">#FF3B30</color>                  <!-- iOS Red (Safety only) -->
-    <color name="primary_dark">#D70015</color>             <!-- Darker red -->
-    <color name="accent">#007AFF</color>                   <!-- iOS Blue -->
-    <color name="surface">#FFFFFF</color>                  <!-- Pure white -->
-    <color name="surface_variant">#F9F9F9</color>          <!-- Very light gray -->
-    <color name="background">#F2F2F7</color>               <!-- iOS grouped background -->
-    <color name="error">#FF3B30</color>                    <!-- iOS red -->
-    <color name="success">#34C759</color>                  <!-- iOS green -->
-    <color name="warning">#871DCE</color>                  <!-- iOS purple -->
+    <!-- Always Dark Theme - Replace your existing colors.xml with this -->
+    <color name="primary">#FF453A</color>                  <!-- Slightly brighter red for dark mode -->
+    <color name="primary_dark">#FF2D23</color>             <!-- Darker red variant -->
+    <color name="accent">#0A84FF</color>                   <!-- iOS Blue for dark mode -->
+    <color name="surface">#1C1C1E</color>                  <!-- Dark surface -->
+    <color name="surface_variant">#2C2C2E</color>          <!-- Darker variant -->
+    <color name="background">#1A1A1A</color>               <!-- Soft dark gray background -->
+    <color name="error">#FF453A</color>                    <!-- iOS red for dark -->
+    <color name="success">#30D158</color>                  <!-- iOS green for dark -->
+    <color name="warning">#BF5AF2</color>                  <!-- iOS purple for dark -->
 
-    <!-- Text Colors (iOS hierarchy) -->
-    <color name="text_primary">#000000</color>             <!-- iOS label primary -->
-    <color name="text_secondary">#3C3C43</color>           <!-- iOS label secondary -->
-    <color name="text_tertiary">#8E8E93</color>            <!-- iOS label tertiary -->
-    <color name="divider">#C6C6C8</color>                  <!-- iOS separator -->
-    <color name="fab_background">#007AFF</color>           <!-- iOS blue -->
+    <!-- Text Colors (Dark mode hierarchy) -->
+    <color name="text_primary">#FFFFFF</color>             <!-- White primary text -->
+    <color name="text_secondary">#EBEBF5</color>           <!-- iOS secondary text for dark -->
+    <color name="text_tertiary">#EBEBF5</color>            <!-- iOS tertiary text for dark -->
+    <color name="divider">#38383A</color>                  <!-- Dark separator -->
+    <color name="fab_background">#B03A3A3C</color>           <!-- iOS blue for dark -->
 
-    <!-- Additional iOS Colors -->
-    <color name="button_primary">#FF3B30</color>           <!-- Red for safety -->
-    <color name="button_secondary">#007AFF</color>         <!-- Blue for other actions -->
-    <color name="border_color">#C6C6C8</color>             <!-- iOS separator -->
-    <color name="report_red">#FF3B30</color>               <!-- iOS red -->
-    <color name="alert_red">#FF3B30</color>                <!-- iOS red -->
-    <color name="white">#FFFFFF</color>
-    <color name="black">#000000</color>
-    <color name="gray">#8E8E93</color>                     <!-- iOS tertiary -->
-    <color name="light_gray">#C7C7CC</color>               <!-- iOS quaternary -->
+    <!-- Additional Dark Mode Colors -->
+    <color name="button_primary">#FF453A</color>           <!-- Red for safety in dark -->
+    <color name="button_secondary">#0A84FF</color>         <!-- Blue for other actions -->
+    <color name="border_color">#38383A</color>             <!-- Dark separator -->
+    <color name="report_red">#FF453A</color>               <!-- iOS red for dark -->
+    <color name="alert_red">#FF453A</color>                <!-- iOS red for dark -->
+    <color name="white">#000000</color>                    <!-- Now black (dark background) -->
+    <color name="black">#FFFFFF</color>                    <!-- Now white (light text) -->
+    <color name="gray">#EBEBF5</color>                     <!-- Light gray for dark mode -->
+    <color name="light_gray">#48484A</color>               <!-- Darker gray -->
 
-    <!-- UI Element Colors -->
-    <color name="text_hint">#8E8E93</color>                <!-- iOS tertiary -->
-    <color name="icon_primary">#000000</color>
-    <color name="icon_secondary">#3C3C43</color>           <!-- iOS secondary -->
+    <!-- UI Element Colors for Dark Mode -->
+    <color name="text_hint">#EBEBF5</color>                <!-- Light hint text -->
+    <color name="icon_primary">#FFFFFF</color>             <!-- White icons -->
+    <color name="icon_secondary">#EBEBF5</color>           <!-- Secondary icon color -->
     <color name="fab_icon">#FFFFFF</color>
-    <color name="bottom_nav_background">#F9F9F9</color>    <!-- Light gray -->
-    <color name="bottom_nav_text">#000000</color>
-    <color name="bottom_nav_icon">#3C3C43</color>          <!-- iOS secondary -->
-    <color name="search_background">#FFFFFF</color>
-    <color name="search_hint">#8E8E93</color>              <!-- iOS tertiary -->
+    <color name="bottom_nav_background">#D93A3A3C</color>    <!-- Dark bottom nav -->
+    <color name="bottom_nav_text">#FFFFFF</color>          <!-- White text -->
+    <color name="bottom_nav_icon">#EBEBF5</color>          <!-- Light icons -->
+    <color name="search_background">#D93A3A3C</color>        <!-- Dark search background -->
+    <color name="search_hint">#EBEBF5</color>              <!-- Light hint text -->
     <color name="transparent">#00000000</color>
-    <color name="background_light">#F2F2F7</color>         <!-- Same as background -->
+    <color name="background_light">#D93A3A3C</color>         <!-- Dark background variant -->
 
-    <!-- Pin Colors (iOS System Colors) -->
-    <color name="category_safety">#FF3B30</color>          <!-- iOS Red -->
-    <color name="category_safety_light">#FFE5E5</color>    <!-- Light red -->
-    <color name="category_safety_fill">#20FF3B30</color>   <!-- Red with transparency -->
-    <color name="category_safety_stroke">#80FF3B30</color> <!-- Red stroke -->
+    <!-- Pin Colors for Dark Mode (slightly brighter for visibility) -->
+    <color name="category_safety">#FF453A</color>          <!-- Brighter red for dark -->
+    <color name="category_safety_light">#2C1515</color>    <!-- Dark red background -->
+    <color name="category_safety_fill">#20FF453A</color>   <!-- Red with transparency -->
+    <color name="category_safety_stroke">#80FF453A</color> <!-- Red stroke -->
 
-    <color name="category_fun">#871DCE</color>             <!-- iOS Yellow -->
-    <color name="category_fun_light">#FFF8E1</color>       <!-- Light yellow -->
-    <color name="category_fun_fill">#20931FE0</color>      <!-- Purple with transparency -->
-    <color name="category_fun_stroke">#871DCE</color>    <!-- Yellow stroke -->
+    <color name="category_fun">#BF5AF2</color>             <!-- Purple for dark mode -->
+    <color name="category_fun_light">#251A2C</color>       <!-- Dark purple background -->
+    <color name="category_fun_fill">#20BF5AF2</color>      <!-- Purple with transparency -->
+    <color name="category_fun_stroke">#BF5AF2</color>      <!-- Purple stroke -->
 
-    <color name="category_lost">#007AFF</color>            <!-- iOS Blue -->
-    <color name="category_lost_light">#E3F2FD</color>      <!-- Light blue -->
-    <color name="category_lost_fill">#20007AFF</color>     <!-- Blue with transparency -->
-    <color name="category_lost_stroke">#80007AFF</color>   <!-- Blue stroke -->
+    <color name="category_lost">#0A84FF</color>            <!-- Brighter blue for dark -->
+    <color name="category_lost_light">#0D1929</color>      <!-- Dark blue background -->
+    <color name="category_lost_fill">#200A84FF</color>     <!-- Blue with transparency -->
+    <color name="category_lost_stroke">#800A84FF</color>   <!-- Blue stroke -->
 
-    <!-- Location Pin Color -->
-    <color name="location_pin">#34C759</color>             <!-- iOS Green -->
+    <!-- Location Pin Colors for Dark Mode -->
+    <color name="location_pin">#30D158</color>             <!-- iOS Green for dark -->
     <color name="favorite_pin">#FF2D92</color>             <!-- iOS Pink -->
 
-    <!-- Category Text Colors for contrast -->
+    <!-- Category Text Colors (white text for dark backgrounds) -->
     <color name="category_safety_text">#FFFFFF</color>     <!-- White on red -->
-    <color name="category_fun_text">#000000</color>        <!-- Black on yellow -->
+    <color name="category_fun_text">#FFFFFF</color>        <!-- White on purple -->
     <color name="category_lost_text">#FFFFFF</color>       <!-- White on blue -->
 </resources>
