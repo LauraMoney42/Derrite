@@ -428,14 +428,6 @@ class MainActivity : AppCompatActivity(),
         android.util.Log.d("MainActivity", "Report created with ID: ${report.id}")
         android.util.Log.d("MainActivity", "Alert checking will be blocked for 60 seconds")
 
-        // IMPROVED: Check for duplicates before adding to map
-        if (!mapManager.isReportOnMap(report.id)) {
-            mapManager.addReportToMap(mapView, report, this)
-            android.util.Log.d("MainActivity", "Added new user report ${report.id} to map")
-        } else {
-            android.util.Log.w("MainActivity", "User report ${report.id} already exists on map")
-        }
-
         preferencesManager.setUserHasCreatedReports(true)
 
         // Show immediate feedback that report is being processed
