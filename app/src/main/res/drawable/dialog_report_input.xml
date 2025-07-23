@@ -33,7 +33,10 @@
             android:minLines="3"
             android:maxLines="5"
             android:gravity="top"
-            android:inputType="textMultiLine|textCapSentences" />
+            android:maxLength="500"
+            android:inputType="textMultiLine|textCapSentences|textNoSuggestions"
+            android:privateImeOptions="nm"
+            />
 
     </com.google.android.material.textfield.TextInputLayout>
 
