@@ -25,7 +25,7 @@
 
     <!-- Search -->
     <string name="search">Search</string>
-    <string name="search_address">Search address or place...</string>
+    <string name="search_address">Search address...</string>
     <string name="clear_search">Clear search</string>
     <string name="searching_address">Searching address...</string>
     <string name="found_address">Found: %1$s</string>

@@ -46,17 +46,16 @@ class FavoritesActivity : AppCompatActivity(), FavoriteManager.FavoriteListener 
     private fun setupUI() {
         val isSpanish = preferencesManager.getSavedLanguage() == "es"
 
-        // Main container with white background
+        // Main container with dark background
         val mainLayout = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            setBackgroundColor(Color.WHITE)
-        }
+            setBackgroundColor(ContextCompat.getColor(this@FavoritesActivity, R.color.dialog_background))        }
 
-        // Header with clean white background
+        // Header with clean dark background
         val headerLayout = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             setPadding(24, 48, 24, 24)
-            setBackgroundColor(Color.WHITE)
+            setBackgroundColor(ContextCompat.getColor(this@FavoritesActivity, R.color.dialog_background))
             gravity = android.view.Gravity.CENTER_VERTICAL
         }
 
@@ -78,7 +77,7 @@ class FavoritesActivity : AppCompatActivity(), FavoriteManager.FavoriteListener 
         val titleText = TextView(this).apply {
             text = if (isSpanish) "Lugares Favoritos" else "Favorite Places"
             textSize = 22f
-            setTextColor(Color.parseColor("#1C1C1E"))
+            setTextColor(ContextCompat.getColor(this@FavoritesActivity, R.color.text_primary))
             layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f).apply {
                 gravity = android.view.Gravity.CENTER
             }
@@ -107,7 +106,7 @@ class FavoritesActivity : AppCompatActivity(), FavoriteManager.FavoriteListener 
         // Content container with light gray background
         val contentContainer = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            setBackgroundColor(Color.parseColor("#F2F2F7"))
+            setBackgroundColor(ContextCompat.getColor(this@FavoritesActivity, R.color.dialog_background))
             setPadding(16, 16, 16, 16)
             layoutParams = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
@@ -134,7 +133,7 @@ class FavoritesActivity : AppCompatActivity(), FavoriteManager.FavoriteListener 
         val emptyTitle = TextView(this).apply {
             text = if (isSpanish) "No hay lugares favoritos" else "No Favorite Places"
             textSize = 22f
-            setTextColor(Color.parseColor("#1C1C1E"))
+            setTextColor(ContextCompat.getColor(this@FavoritesActivity, R.color.text_primary))
             gravity = android.view.Gravity.CENTER
             setPadding(0, 0, 0, 8)
         }
@@ -217,10 +216,10 @@ class FavoritesActivity : AppCompatActivity(), FavoriteManager.FavoriteListener 
     private fun createFavoriteCard(favorite: FavoritePlace): LinearLayout {
         val isSpanish = preferencesManager.getSavedLanguage() == "es"
 
-        // Card container with white background and rounded corners
+        // Card container with dark background and rounded corners
         val card = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            setBackgroundColor(Color.WHITE)
+            setBackgroundColor(ContextCompat.getColor(this@FavoritesActivity, R.color.dialog_background))
             setPadding(20, 20, 20, 20)
             layoutParams = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
@@ -250,7 +249,7 @@ class FavoritesActivity : AppCompatActivity(), FavoriteManager.FavoriteListener 
         val nameText = TextView(this).apply {
             text = favorite.name
             textSize = 17f
-            setTextColor(Color.parseColor("#1C1C1E"))
+            setTextColor(ContextCompat.getColor(this@FavoritesActivity, R.color.text_primary))
             layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
         }
         headerLayout.addView(nameText)

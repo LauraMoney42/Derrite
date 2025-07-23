@@ -843,22 +843,64 @@ class MainActivity : AppCompatActivity(),
     private fun showMapLongPressOptions(location: GeoPoint) {
         val isSpanish = preferencesManager.getSavedLanguage() == "es"
 
+        val dialogLayout = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(32, 32, 32, 32)
+            setBackgroundColor(ContextCompat.getColor(this@MainActivity, R.color.dialog_background))
+            background = ContextCompat.getDrawable(this@MainActivity, R.drawable.white_card_background)
+        }
+
+        val titleText = TextView(this).apply {
+            text = if (isSpanish) "¿Qué deseas hacer?" else "What would you like to do?"
+            textSize = 20f
+            setTextColor(ContextCompat.getColor(this@MainActivity, R.color.text_primary))
+            gravity = android.view.Gravity.CENTER
+            setPadding(0, 0, 0, 24)
+        }
+        dialogLayout.addView(titleText)
+
         val options = if (isSpanish) {
             arrayOf("Crear Nuevo Reporte", "Agregar a Favoritos", "Cancelar")
         } else {
             arrayOf("Create New Report", "Add to Favorites", "Cancel")
         }
 
-        AlertDialog.Builder(this)
-            .setTitle(if (isSpanish) "¿Qué deseas hacer?" else "What would you like to do?")
-            .setItems(options) { _, which ->
-                when (which) {
+        val dialog = AlertDialog.Builder(this)
+            .setView(dialogLayout)
+            .setCancelable(true)
+            .create()
+
+        dialog.window?.setBackgroundDrawableResource(android.R.color.transparent)
+
+        // Add option buttons
+        for ((index, option) in options.withIndex()) {
+            val optionButton = Button(this).apply {
+                text = option
+                setTextColor(ContextCompat.getColor(this@MainActivity, R.color.text_primary))
+                setBackgroundColor(ContextCompat.getColor(this@MainActivity, R.color.surface_variant))
+                setPadding(20, 16, 20, 16)
+                textSize = 16f
+                layoutParams = LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT,
+                    LinearLayout.LayoutParams.WRAP_CONTENT
+                ).apply {
+                    setMargins(0, 0, 0, 12)
+                }
+            }
+
+            optionButton.setOnClickListener {
+                when (index) {
                     0 -> showReportInputDialog(location)
                     1 -> dialogManager.showAddFavoriteDialog(location, favoriteManager)
                     2 -> { /* Cancel - do nothing */ }
                 }
+                dialog.dismiss()
             }
-            .show()
+
+            dialogLayout.addView(optionButton)
+        }
+
+        dialog.show()
     }
 
     private fun showReportInputDialog(location: GeoPoint) {
@@ -1273,8 +1315,8 @@ class MainActivity : AppCompatActivity(),
 
         val textColor = when {
             isError -> Color.RED
-            isLoading -> Color.parseColor("#888888")
-            else -> Color.parseColor("#3C3C43")
+            isLoading -> ContextCompat.getColor(this, R.color.text_secondary)
+            else -> ContextCompat.getColor(this, R.color.text_primary)
         }
         statusText.setTextColor(textColor)
 

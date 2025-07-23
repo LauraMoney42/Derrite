@@ -41,7 +41,7 @@
     <color name="search_hint">#EBEBF5</color>              <!-- Light hint text -->
     <color name="transparent">#00000000</color>
     <color name="background_light">#D93A3A3C</color>         <!-- Dark background variant -->
-
+    <color name="dialog_background">#E63A3A3C</color>
     <!-- Pin Colors for Dark Mode (slightly brighter for visibility) -->
     <color name="category_safety">#FF453A</color>          <!-- Brighter red for dark -->
     <color name="category_safety_light">#2C1515</color>    <!-- Dark red background -->

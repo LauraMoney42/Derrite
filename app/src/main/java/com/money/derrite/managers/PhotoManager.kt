@@ -71,6 +71,8 @@ class PhotoManager(
         }
     }
 
+    // In your PhotoManager.kt, replace the showPhotoSelectionDialog method with this:
+
     fun showPhotoSelectionDialog(callback: PhotoCallback) {
         currentCallback = callback
         val isSpanish = preferencesManager.getSavedLanguage() == "es"
@@ -81,7 +83,7 @@ class PhotoManager(
             arrayOf("Take Photo", "Choose from Gallery")
         }
 
-        AlertDialog.Builder(activity)
+        val dialog = AlertDialog.Builder(activity)
             .setTitle(if (isSpanish) "Agregar Foto" else "Add Photo")
             .setItems(options) { _, which ->
                 when (which) {
@@ -90,7 +92,43 @@ class PhotoManager(
                 }
             }
             .setNegativeButton(if (isSpanish) "Cancelar" else "Cancel", null)
-            .show()
+            .create()
+
+        // Force dark styling after dialog creation
+        dialog.setOnShowListener {
+            try {
+                // Create dark rounded background programmatically
+                val drawable = android.graphics.drawable.GradientDrawable()
+                drawable.setColor(android.graphics.Color.parseColor("#FF2C2C2C")) // Dark gray
+                drawable.cornerRadius = 32f // 12dp in pixels (roughly)
+                dialog.window?.setBackgroundDrawable(drawable)
+
+                // Force title text color to white
+                val titleId = activity.resources.getIdentifier("alertTitle", "id", "android")
+                dialog.findViewById<android.widget.TextView>(titleId)?.setTextColor(
+                    android.graphics.Color.WHITE
+                )
+
+                // Force list item colors to white
+                val listView = dialog.listView
+                listView?.let { lv ->
+                    for (i in 0 until lv.count) {
+                        val item = lv.getChildAt(i) as? android.widget.TextView
+                        item?.setTextColor(android.graphics.Color.WHITE)
+                    }
+                }
+
+                // Force button color to blue
+                dialog.getButton(AlertDialog.BUTTON_NEGATIVE)?.setTextColor(
+                    android.graphics.Color.parseColor("#FF007AFF") // iOS blue
+                )
+
+            } catch (e: Exception) {
+                android.util.Log.e("PhotoManager", "Error styling dialog: ${e.message}")
+            }
+        }
+
+        dialog.show()
     }
 
     private fun requestCameraPermissionAndCapture() {

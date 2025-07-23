@@ -20,7 +20,7 @@
 
     <!-- Search -->
     <string name="search">Buscar</string>
-    <string name="search_address">Buscar dirección o lugar...</string>
+    <string name="search_address">Buscar dirección...</string>
     <string name="clear_search">Limpiar búsqueda</string>
     <string name="searching_address">Buscando dirección...</string>
     <string name="found_address">Encontrado: %1$s</string>

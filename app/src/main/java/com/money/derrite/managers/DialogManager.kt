@@ -41,14 +41,14 @@ class DialogManager(
         val dialogLayout = LinearLayout(context).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(32, 32, 32, 32)
-            setBackgroundColor(Color.WHITE)
+            setBackgroundColor(ContextCompat.getColor(context, R.color.dialog_background))
             background = ContextCompat.getDrawable(context, R.drawable.white_card_background)
         }
 
         val titleText = TextView(context).apply {
             text = if (isSpanish) "Confirmar Reporte de Seguridad" else "Confirm Safety Report"
             textSize = 20f
-            setTextColor(Color.parseColor("#333333"))
+            setTextColor(ContextCompat.getColor(context, R.color.text_primary))
             gravity = android.view.Gravity.CENTER
             setPadding(0, 0, 0, 24)
         }
@@ -57,7 +57,7 @@ class DialogManager(
         val messageText = TextView(context).apply {
             text = if (isSpanish) "Crear un reporte en esta ubicación" else "Create a report at this location"
             textSize = 16f
-            setTextColor(Color.parseColor("#666666"))
+            setTextColor(ContextCompat.getColor(context, R.color.text_secondary))
             gravity = android.view.Gravity.CENTER
             setPadding(0, 0, 0, 32)
         }
@@ -70,7 +70,7 @@ class DialogManager(
 
         val btnCancel = Button(context).apply {
             text = if (isSpanish) "Cancelar" else "Cancel"
-            setTextColor(Color.parseColor("#666666"))
+            setTextColor(ContextCompat.getColor(context, R.color.text_secondary))
             setBackgroundColor(Color.TRANSPARENT)
             setPadding(32, 16, 32, 16)
             layoutParams = LinearLayout.LayoutParams(
@@ -84,7 +84,7 @@ class DialogManager(
         val btnConfirm = Button(context).apply {
             text = if (isSpanish) "Sí, Reportar" else "Yes, Report"
             setTextColor(Color.WHITE)
-            setBackgroundColor(Color.parseColor("#4CAF50"))
+            setBackgroundColor(Color.parseColor("#5A8A5A"))
             setPadding(32, 16, 32, 16)
         }
 
@@ -123,7 +123,7 @@ class DialogManager(
         val dialogLayout = LinearLayout(context).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(32, 32, 32, 32)
-            setBackgroundColor(Color.WHITE)
+            setBackgroundColor(ContextCompat.getColor(context, R.color.dialog_background))
             background = ContextCompat.getDrawable(context, R.drawable.white_card_background)
         }
 
@@ -131,7 +131,7 @@ class DialogManager(
         val titleText = TextView(context).apply {
             text = if (isSpanish) "Crear Reporte de Seguridad" else "Create Safety Report"
             textSize = 20f
-            setTextColor(Color.parseColor("#333333"))
+            setTextColor(ContextCompat.getColor(context, R.color.text_primary))
             gravity = android.view.Gravity.CENTER
             setPadding(0, 0, 0, 24)
         }
@@ -143,7 +143,7 @@ class DialogManager(
 //            textSize = 16f
 //            setTextColor(ContextCompat.getColor(context, currentCategory.getColorResId()))
 //            setPadding(16, 12, 16, 12)
-//            setBackgroundColor(Color.parseColor("#F5F5F5"))
+//            setBackgroundColor(ContextCompat.getColor(context, R.color.surface_variant))
 //            layoutParams = LinearLayout.LayoutParams(
 //                LinearLayout.LayoutParams.MATCH_PARENT,
 //                LinearLayout.LayoutParams.WRAP_CONTENT
@@ -157,16 +157,16 @@ class DialogManager(
         val descLabel = TextView(context).apply {
             text = if (isSpanish) "Descripción" else "Description"
             textSize = 16f
-            setTextColor(Color.parseColor("#333333"))
+            setTextColor(ContextCompat.getColor(context, R.color.text_primary))
             setPadding(0, 0, 0, 8)
         }
         dialogLayout.addView(descLabel)
 
         val editReportText = com.google.android.material.textfield.TextInputEditText(context).apply {
-            hint = if (isSpanish) "Describe la situación de seguridad..." else "Describe the safety situation..."
-            setTextColor(Color.parseColor("#333333"))
+            hint = if (isSpanish) "Describe la situación..." else "Describe the situation..."
+            setTextColor(ContextCompat.getColor(context, R.color.text_primary))
             setHintTextColor(Color.parseColor("#999999"))
-            setBackgroundColor(Color.parseColor("#F5F5F5"))
+            setBackgroundColor(ContextCompat.getColor(context, R.color.surface_variant))
             setPadding(16, 16, 16, 16)
             minLines = 3
             maxLines = 5
@@ -196,24 +196,15 @@ class DialogManager(
                 gravity = android.view.Gravity.CENTER_HORIZONTAL
             }
             scaleType = android.widget.ImageView.ScaleType.CENTER_CROP
-            setBackgroundColor(Color.parseColor("#F5F5F5"))
+            setBackgroundColor(ContextCompat.getColor(context, R.color.surface_variant))
         }
         photoPreviewContainer.addView(photoPreview)
-
-        val photoStatus = TextView(context).apply {
-            text = if (isSpanish) "✅ Foto seleccionada" else "✅ Photo selected"
-            textSize = 14f
-            setTextColor(Color.parseColor("#4CAF50"))
-            gravity = android.view.Gravity.CENTER
-            setPadding(0, 8, 0, 8)
-        }
-        photoPreviewContainer.addView(photoStatus)
 
         // DEFINE btnAddPhoto BEFORE using it
         val btnAddPhoto = Button(context).apply {
             text = if (isSpanish) "Agregar Foto" else "Add Photo"
-            setTextColor(Color.parseColor("#666666"))
-            setBackgroundColor(Color.parseColor("#F5F5F5"))
+            setTextColor(ContextCompat.getColor(context, R.color.text_secondary))
+            setBackgroundColor(ContextCompat.getColor(context, R.color.surface_variant))
             setPadding(20, 16, 20, 16)
             textSize = 16f
             layoutParams = LinearLayout.LayoutParams(
@@ -256,7 +247,7 @@ class DialogManager(
 
         val btnCancel = Button(context).apply {
             text = if (isSpanish) "Cancelar" else "Cancel"
-            setTextColor(Color.parseColor("#666666"))
+            setTextColor(ContextCompat.getColor(context, R.color.text_secondary))
             setBackgroundColor(Color.TRANSPARENT)
             setPadding(32, 16, 32, 16)
             layoutParams = LinearLayout.LayoutParams(
@@ -270,7 +261,7 @@ class DialogManager(
         val btnSubmit = Button(context).apply {
             text = if (isSpanish) "Enviar" else "Submit"
             setTextColor(Color.WHITE)
-            setBackgroundColor(Color.parseColor("#4CAF50"))
+            setBackgroundColor(Color.parseColor("#5A8A5A"))
             setPadding(32, 16, 32, 16)
             textSize = 16f
         }
@@ -377,7 +368,7 @@ class DialogManager(
         val btnEdit = Button(context).apply {
             text = if (isSpanish) "Editar Favorito" else "Edit Favorite"
             setTextColor(Color.WHITE)
-            setBackgroundColor(Color.parseColor("#4CAF50"))
+            setBackgroundColor(Color.parseColor("#5A8A5A"))
             layoutParams = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
                 LinearLayout.LayoutParams.WRAP_CONTENT
@@ -400,7 +391,7 @@ class DialogManager(
 
         val btnCancel = Button(context).apply {
             text = if (isSpanish) "Cerrar" else "Close"
-            setTextColor(Color.parseColor("#666666"))
+            setTextColor(ContextCompat.getColor(context, R.color.text_secondary))
             setBackgroundColor(Color.TRANSPARENT)
             layoutParams = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.WRAP_CONTENT,
@@ -451,14 +442,14 @@ class DialogManager(
         val dialogLayout = LinearLayout(context).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(32, 32, 32, 32)
-            setBackgroundColor(Color.WHITE)
+            setBackgroundColor(ContextCompat.getColor(context, R.color.dialog_background))
             background = ContextCompat.getDrawable(context, R.drawable.white_card_background)
         }
 
         val titleText = TextView(context).apply {
             text = if (isSpanish) "Eliminar Favorito" else "Remove Favorite"
             textSize = 20f
-            setTextColor(Color.parseColor("#333333"))
+            setTextColor(ContextCompat.getColor(context, R.color.text_primary))
             gravity = android.view.Gravity.CENTER
             setPadding(0, 0, 0, 16)
         }
@@ -469,7 +460,7 @@ class DialogManager(
                 "¿Estás seguro de que quieres eliminar '${favorite.name}' de tus favoritos?"
             else "Are you sure you want to remove '${favorite.name}' from your favorites?"
             textSize = 16f
-            setTextColor(Color.parseColor("#666666"))
+            setTextColor(ContextCompat.getColor(context, R.color.text_secondary))
             gravity = android.view.Gravity.CENTER
             setPadding(0, 0, 0, 32)
         }
@@ -482,7 +473,7 @@ class DialogManager(
 
         val btnCancel = Button(context).apply {
             text = if (isSpanish) "Cancelar" else "Cancel"
-            setTextColor(Color.parseColor("#666666"))
+            setTextColor(ContextCompat.getColor(context, R.color.text_secondary))
             setBackgroundColor(Color.TRANSPARENT)
             setPadding(32, 16, 32, 16)
             layoutParams = LinearLayout.LayoutParams(
@@ -526,14 +517,14 @@ class DialogManager(
         val dialogLayout = LinearLayout(context).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(32, 32, 32, 32)
-            setBackgroundColor(Color.WHITE)
+            setBackgroundColor(ContextCompat.getColor(context, R.color.dialog_background))
             background = ContextCompat.getDrawable(context, R.drawable.white_card_background)
         }
 
         val titleText = TextView(context).apply {
             text = if (isSpanish) "Editar Favorito" else "Edit Favorite"
             textSize = 20f
-            setTextColor(Color.parseColor("#333333"))
+            setTextColor(ContextCompat.getColor(context, R.color.text_primary))
             gravity = android.view.Gravity.CENTER
             setPadding(0, 0, 0, 24)
         }
@@ -543,9 +534,9 @@ class DialogManager(
         val nameInput = com.google.android.material.textfield.TextInputEditText(context).apply {
             setText(favorite.name)
             hint = if (isSpanish) "Nombre del lugar" else "Place name"
-            setTextColor(Color.parseColor("#333333"))
+            setTextColor(ContextCompat.getColor(context, R.color.text_primary))
             setHintTextColor(Color.parseColor("#999999"))
-            setBackgroundColor(Color.parseColor("#F5F5F5"))
+            setBackgroundColor(ContextCompat.getColor(context, R.color.surface_variant))
             setPadding(16, 16, 16, 16)
             layoutParams = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
@@ -560,9 +551,9 @@ class DialogManager(
         val descriptionInput = com.google.android.material.textfield.TextInputEditText(context).apply {
             setText(favorite.description)
             hint = if (isSpanish) "Descripción" else "Description"
-            setTextColor(Color.parseColor("#333333"))
+            setTextColor(ContextCompat.getColor(context, R.color.text_primary))
             setHintTextColor(Color.parseColor("#999999"))
-            setBackgroundColor(Color.parseColor("#F5F5F5"))
+            setBackgroundColor(ContextCompat.getColor(context, R.color.surface_variant))
             setPadding(16, 16, 16, 16)
             layoutParams = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
@@ -581,7 +572,7 @@ class DialogManager(
 
         val btnCancel = Button(context).apply {
             text = if (isSpanish) "Cancelar" else "Cancel"
-            setTextColor(Color.parseColor("#666666"))
+            setTextColor(ContextCompat.getColor(context, R.color.text_secondary))
             setBackgroundColor(Color.TRANSPARENT)
             setPadding(32, 16, 32, 16)
             layoutParams = LinearLayout.LayoutParams(
@@ -595,7 +586,7 @@ class DialogManager(
         val btnSave = Button(context).apply {
             text = if (isSpanish) "Guardar" else "Save"
             setTextColor(Color.WHITE)
-            setBackgroundColor(Color.parseColor("#4CAF50"))
+            setBackgroundColor(Color.parseColor("#5A8A5A"))
             setPadding(32, 16, 32, 16)
         }
 
@@ -641,14 +632,14 @@ class DialogManager(
         val dialogLayout = LinearLayout(context).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(32, 32, 32, 32)
-            setBackgroundColor(Color.WHITE)
+            setBackgroundColor(ContextCompat.getColor(context, R.color.dialog_background))
             background = ContextCompat.getDrawable(context, R.drawable.white_card_background)
         }
 
         val titleText = TextView(context).apply {
             text = if (isSpanish) "Alertas para ${favorite.name}" else "Alerts for ${favorite.name}"
             textSize = 20f
-            setTextColor(Color.parseColor("#333333"))
+            setTextColor(ContextCompat.getColor(context, R.color.text_primary))
             gravity = android.view.Gravity.CENTER
             setPadding(0, 0, 0, 24)
         }
@@ -658,7 +649,7 @@ class DialogManager(
             val messageText = TextView(context).apply {
                 text = if (isSpanish) "No hay alertas nuevas para este favorito" else "No new alerts for this favorite"
                 textSize = 16f
-                setTextColor(Color.parseColor("#666666"))
+                setTextColor(ContextCompat.getColor(context, R.color.text_secondary))
                 gravity = android.view.Gravity.CENTER
                 setPadding(0, 0, 0, 24)
             }
@@ -670,9 +661,9 @@ class DialogManager(
             val messageText = TextView(context).apply {
                 text = alertMessages.joinToString("\n\n")
                 textSize = 16f
-                setTextColor(Color.parseColor("#333333"))
+                setTextColor(ContextCompat.getColor(context, R.color.text_primary))
                 setPadding(16, 16, 16, 16)
-                setBackgroundColor(Color.parseColor("#F5F5F5"))
+                setBackgroundColor(ContextCompat.getColor(context, R.color.surface_variant))
                 layoutParams = LinearLayout.LayoutParams(
                     LinearLayout.LayoutParams.MATCH_PARENT,
                     LinearLayout.LayoutParams.WRAP_CONTENT
@@ -685,7 +676,7 @@ class DialogManager(
             val btnMarkRead = Button(context).apply {
                 text = if (isSpanish) "Marcar como Leído" else "Mark as Read"
                 setTextColor(Color.WHITE)
-                setBackgroundColor(Color.parseColor("#4CAF50"))
+                setBackgroundColor(Color.parseColor("#5A8A5A"))
                 setPadding(32, 16, 32, 16)
                 layoutParams = LinearLayout.LayoutParams(
                     LinearLayout.LayoutParams.MATCH_PARENT,
@@ -703,7 +694,7 @@ class DialogManager(
 
         val btnClose = Button(context).apply {
             text = if (isSpanish) "Cerrar" else "Close"
-            setTextColor(Color.parseColor("#666666"))
+            setTextColor(ContextCompat.getColor(context, R.color.text_secondary))
             setBackgroundColor(Color.TRANSPARENT)
             layoutParams = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.WRAP_CONTENT,
@@ -731,14 +722,14 @@ class DialogManager(
         val dialogLayout = LinearLayout(context).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(32, 32, 32, 32)
-            setBackgroundColor(Color.WHITE)
+            setBackgroundColor(ContextCompat.getColor(context, R.color.dialog_background))
             background = ContextCompat.getDrawable(context, R.drawable.white_card_background)
         }
 
         val titleText = TextView(context).apply {
             text = if (isSpanish) "Agregar a Favoritos" else "Add to Favorites"
             textSize = 20f
-            setTextColor(Color.parseColor("#333333"))
+            setTextColor(ContextCompat.getColor(context, R.color.text_primary))
             gravity = android.view.Gravity.CENTER
             setPadding(0, 0, 0, 24)
         }
@@ -747,9 +738,9 @@ class DialogManager(
         // Name input
         val nameInput = TextInputEditText(context).apply {
             hint = if (isSpanish) "Nombre (ej. Escuela de Emma, Casa, Trabajo)" else "Name (e.g., Emma's School, Home, Work)"
-            setTextColor(Color.parseColor("#333333"))
+            setTextColor(ContextCompat.getColor(context, R.color.text_primary))
             setHintTextColor(Color.parseColor("#999999"))
-            setBackgroundColor(Color.parseColor("#F5F5F5"))
+            setBackgroundColor(ContextCompat.getColor(context, R.color.surface_variant))
             setPadding(16, 16, 16, 16)
             layoutParams = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
@@ -763,9 +754,9 @@ class DialogManager(
         // Description input
         val descriptionInput = TextInputEditText(context).apply {
             hint = if (isSpanish) "Descripción (opcional)" else "Description (optional)"
-            setTextColor(Color.parseColor("#333333"))
+            setTextColor(ContextCompat.getColor(context, R.color.text_primary))
             setHintTextColor(Color.parseColor("#999999"))
-            setBackgroundColor(Color.parseColor("#F5F5F5"))
+            setBackgroundColor(ContextCompat.getColor(context, R.color.surface_variant))
             setPadding(16, 16, 16, 16)
             layoutParams = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
@@ -783,9 +774,9 @@ class DialogManager(
             else
                 "💡 You'll receive safety alerts for this place even when the app is closed"
             textSize = 12f
-            setTextColor(Color.parseColor("#666666"))
+            setTextColor(ContextCompat.getColor(context, R.color.text_secondary))
             setPadding(12, 12, 12, 16)
-            setBackgroundColor(Color.parseColor("#F5F5F5"))
+            setBackgroundColor(ContextCompat.getColor(context, R.color.surface_variant))
             layoutParams = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
                 LinearLayout.LayoutParams.WRAP_CONTENT
@@ -803,7 +794,7 @@ class DialogManager(
 
         val btnCancel = Button(context).apply {
             text = if (isSpanish) "Cancelar" else "Cancel"
-            setTextColor(Color.parseColor("#666666"))
+            setTextColor(ContextCompat.getColor(context, R.color.text_secondary))
             setBackgroundColor(Color.TRANSPARENT)
             setPadding(32, 16, 32, 16)
             layoutParams = LinearLayout.LayoutParams(
@@ -868,7 +859,7 @@ class DialogManager(
         val dialogLayout = LinearLayout(context).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(32, 32, 32, 32)
-            setBackgroundColor(Color.WHITE)
+            setBackgroundColor(ContextCompat.getColor(context, R.color.dialog_background))
             background = ContextCompat.getDrawable(context, R.drawable.white_card_background)
         }
 
@@ -886,7 +877,7 @@ class DialogManager(
         val contentLabel = TextView(context).apply {
             text = if (isSpanish) "Contenido" else "Content"
             textSize = 16f
-            setTextColor(Color.parseColor("#333333"))
+            setTextColor(ContextCompat.getColor(context, R.color.text_primary))
             setPadding(0, 0, 0, 8)
         }
         dialogLayout.addView(contentLabel)
@@ -895,9 +886,9 @@ class DialogManager(
         val textReportContent = TextView(context).apply {
             text = report.originalText
             textSize = 16f
-            setTextColor(Color.parseColor("#333333"))
+            setTextColor(ContextCompat.getColor(context, R.color.text_primary))
             setPadding(16, 16, 16, 16)
-            setBackgroundColor(Color.parseColor("#F5F5F5"))
+            setBackgroundColor(ContextCompat.getColor(context, R.color.surface_variant))
             layoutParams = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
                 LinearLayout.LayoutParams.WRAP_CONTENT
@@ -912,7 +903,7 @@ class DialogManager(
             val photoLabel = TextView(context).apply {
                 text = if (isSpanish) "Foto" else "Photo"
                 textSize = 16f
-                setTextColor(Color.parseColor("#333333"))
+                setTextColor(ContextCompat.getColor(context, R.color.text_primary))
                 setPadding(0, 0, 0, 8)
             }
             dialogLayout.addView(photoLabel)
@@ -925,7 +916,7 @@ class DialogManager(
                     setMargins(0, 0, 0, 24)
                 }
                 scaleType = android.widget.ImageView.ScaleType.CENTER_CROP
-                setBackgroundColor(Color.parseColor("#F5F5F5"))
+                setBackgroundColor(ContextCompat.getColor(context, R.color.surface_variant))
             }
 
             try {
@@ -971,7 +962,7 @@ class DialogManager(
         btnTranslate.setOnClickListener {
             if (!isTranslated) {
                 btnTranslate.text = if (isSpanish) "Traduciendo..." else "Translating..."
-                btnTranslate.setTextColor(Color.parseColor("#666666")) // Gray during loading
+                btnTranslate.setTextColor(ContextCompat.getColor(context, R.color.text_secondary)) // Gray during loading
                 btnTranslate.paintFlags = btnTranslate.paintFlags and Paint.UNDERLINE_TEXT_FLAG.inv() // Remove underline during loading
 
                 val targetLang = preferencesManager.getSavedLanguage()
@@ -1010,7 +1001,7 @@ class DialogManager(
         val timeText = TextView(context).apply {
             text = "📍 ${if (isSpanish) "Reportado" else "Reported"}: ${getTimeAgo(report.timestamp)}"
             textSize = 14f
-            setTextColor(Color.parseColor("#666666"))
+            setTextColor(ContextCompat.getColor(context, R.color.text_secondary))
             gravity = android.view.Gravity.CENTER
             setPadding(0, 0, 0, 24)
         }
@@ -1019,7 +1010,7 @@ class DialogManager(
         // Close button
         val btnClose = Button(context).apply {
             text = if (isSpanish) "Cerrar" else "Close"
-            setTextColor(Color.parseColor("#666666"))
+            setTextColor(ContextCompat.getColor(context, R.color.text_secondary))
             setBackgroundColor(Color.TRANSPARENT)
             layoutParams = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.WRAP_CONTENT,
@@ -1055,14 +1046,14 @@ class DialogManager(
         val dialogLayout = LinearLayout(context).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(32, 32, 32, 32)
-            setBackgroundColor(Color.WHITE)
+            setBackgroundColor(ContextCompat.getColor(context, R.color.dialog_background))
             background = ContextCompat.getDrawable(context, R.drawable.white_card_background)
         }
 
         val titleText = TextView(context).apply {
             text = if (isSpanish) "Alertas de Seguridad Cercanas" else "Nearby Safety Alerts"
             textSize = 20f
-            setTextColor(Color.parseColor("#333333"))
+            setTextColor(ContextCompat.getColor(context, R.color.text_primary))
             gravity = android.view.Gravity.CENTER
             setPadding(0, 0, 0, 24)
         }
@@ -1082,7 +1073,7 @@ class DialogManager(
             val messageText = TextView(context).apply {
                 text = if (isSpanish) "No hay alertas de seguridad nuevas en tu área" else "No new safety alerts in your area"
                 textSize = 16f
-                setTextColor(Color.parseColor("#666666"))
+                setTextColor(ContextCompat.getColor(context, R.color.text_secondary))
                 gravity = android.view.Gravity.CENTER
                 setPadding(0, 0, 0, 24)
             }
@@ -1094,9 +1085,9 @@ class DialogManager(
             val messageText = TextView(context).apply {
                 text = alertMessages.joinToString("\n\n")
                 textSize = 16f
-                setTextColor(Color.parseColor("#333333"))
+                setTextColor(ContextCompat.getColor(context, R.color.text_primary))
                 setPadding(16, 16, 16, 16)
-                setBackgroundColor(Color.parseColor("#F5F5F5"))
+                setBackgroundColor(ContextCompat.getColor(context, R.color.surface_variant))
                 layoutParams = LinearLayout.LayoutParams(
                     LinearLayout.LayoutParams.MATCH_PARENT,
                     LinearLayout.LayoutParams.WRAP_CONTENT
@@ -1109,7 +1100,7 @@ class DialogManager(
             val btnMarkRead = Button(context).apply {
                 text = if (isSpanish) "Marcar como Leído" else "Mark as Read"
                 setTextColor(Color.WHITE)
-                setBackgroundColor(Color.parseColor("#4CAF50"))
+                setBackgroundColor(Color.parseColor("#5A8A5A"))
                 setPadding(32, 16, 32, 16)
                 layoutParams = LinearLayout.LayoutParams(
                     LinearLayout.LayoutParams.MATCH_PARENT,
@@ -1130,7 +1121,7 @@ class DialogManager(
 
         val btnClose = Button(context).apply {
             text = if (isSpanish) "Cerrar" else "Close"
-            setTextColor(Color.parseColor("#666666"))
+            setTextColor(ContextCompat.getColor(context, R.color.text_secondary))
             setBackgroundColor(Color.TRANSPARENT)
             layoutParams = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.WRAP_CONTENT,
@@ -1151,14 +1142,14 @@ class DialogManager(
         val dialogLayout = LinearLayout(context).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(32, 32, 32, 32)
-            setBackgroundColor(Color.WHITE)
+            setBackgroundColor(ContextCompat.getColor(context, R.color.dialog_background))
             background = ContextCompat.getDrawable(context, R.drawable.white_card_background)
         }
 
         val titleText = TextView(context).apply {
             text = if (isSpanish) "Configuración" else "Settings"
             textSize = 20f
-            setTextColor(Color.parseColor("#333333"))
+            setTextColor(ContextCompat.getColor(context, R.color.text_primary))
             gravity = android.view.Gravity.CENTER
             setPadding(0, 0, 0, 24)
         }
@@ -1183,8 +1174,8 @@ class DialogManager(
         for ((index, item) in items.withIndex()) {
             val itemButton = Button(context).apply {
                 text = item
-                setTextColor(Color.parseColor("#333333"))
-                setBackgroundColor(Color.parseColor("#F5F5F5"))
+                setTextColor(ContextCompat.getColor(context, R.color.text_primary))
+                setBackgroundColor(ContextCompat.getColor(context, R.color.surface_variant))
                 setPadding(20, 16, 20, 16)
                 textSize = 16f
                 layoutParams = LinearLayout.LayoutParams(
@@ -1207,7 +1198,7 @@ class DialogManager(
 
         val btnClose = Button(context).apply {
             text = if (isSpanish) "Cerrar" else "Close"
-            setTextColor(Color.parseColor("#666666"))
+            setTextColor(ContextCompat.getColor(context, R.color.text_secondary))
             setBackgroundColor(Color.TRANSPARENT)
             setPadding(32, 24, 32, 24)
             layoutParams = LinearLayout.LayoutParams(
@@ -1266,14 +1257,14 @@ class DialogManager(
         val dialogLayout = LinearLayout(context).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(32, 32, 32, 32)
-            setBackgroundColor(Color.WHITE)
+            setBackgroundColor(ContextCompat.getColor(context, R.color.dialog_background))
             background = ContextCompat.getDrawable(context, R.drawable.white_card_background)
         }
 
         val titleText = TextView(context).apply {
             text = if (isSpanish) "Distancia de Alerta" else "Alert Distance"
             textSize = 20f
-            setTextColor(Color.parseColor("#333333"))
+            setTextColor(ContextCompat.getColor(context, R.color.text_primary))
             gravity = android.view.Gravity.CENTER
             setPadding(0, 0, 0, 24)
         }
@@ -1290,8 +1281,8 @@ class DialogManager(
         for ((index, option) in options.withIndex()) {
             val optionButton = Button(context).apply {
                 text = option
-                setTextColor(Color.parseColor("#333333"))
-                setBackgroundColor(Color.parseColor("#F5F5F5"))
+                setTextColor(ContextCompat.getColor(context, R.color.text_primary))
+                setBackgroundColor(ContextCompat.getColor(context, R.color.surface_variant))
                 setPadding(20, 16, 20, 16)
                 textSize = 16f
                 layoutParams = LinearLayout.LayoutParams(
@@ -1318,14 +1309,14 @@ class DialogManager(
         val dialogLayout = LinearLayout(context).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(32, 32, 32, 32)
-            setBackgroundColor(Color.WHITE)
+            setBackgroundColor(ContextCompat.getColor(context, R.color.dialog_background))
             background = ContextCompat.getDrawable(context, R.drawable.white_card_background)
         }
 
         val titleText = TextView(context).apply {
             text = if (isSpanish) "Preferencias de Usuario" else "User Preferences"
             textSize = 20f
-            setTextColor(Color.parseColor("#333333"))
+            setTextColor(ContextCompat.getColor(context, R.color.text_primary))
             gravity = android.view.Gravity.CENTER
             setPadding(0, 0, 0, 24)
         }
@@ -1335,7 +1326,7 @@ class DialogManager(
         val distanceLabel = TextView(context).apply {
             text = if (isSpanish) "Distancia de Alerta" else "Alert Distance"
             textSize = 16f
-            setTextColor(Color.parseColor("#333333"))
+            setTextColor(ContextCompat.getColor(context, R.color.text_primary))
             setPadding(0, 0, 0, 8)
         }
         dialogLayout.addView(distanceLabel)
@@ -1344,9 +1335,9 @@ class DialogManager(
         val distanceDisplay = TextView(context).apply {
             text = currentAlertDistance
             textSize = 14f
-            setTextColor(Color.parseColor("#666666"))
+            setTextColor(ContextCompat.getColor(context, R.color.text_secondary))
             setPadding(16, 12, 16, 12)
-            setBackgroundColor(Color.parseColor("#F5F5F5"))
+            setBackgroundColor(ContextCompat.getColor(context, R.color.surface_variant))
             layoutParams = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
                 LinearLayout.LayoutParams.WRAP_CONTENT
@@ -1368,7 +1359,7 @@ class DialogManager(
         val alarmLabel = TextView(context).apply {
             text = if (isSpanish) "Configuración de Alarma" else "Alarm Settings"
             textSize = 16f
-            setTextColor(Color.parseColor("#333333"))
+            setTextColor(ContextCompat.getColor(context, R.color.text_primary))
             setPadding(0, 0, 0, 12)
         }
         dialogLayout.addView(alarmLabel)
@@ -1377,7 +1368,7 @@ class DialogManager(
             orientation = LinearLayout.HORIZONTAL
             gravity = android.view.Gravity.CENTER_VERTICAL
             setPadding(16, 12, 16, 12)
-            setBackgroundColor(Color.parseColor("#F5F5F5"))
+            setBackgroundColor(ContextCompat.getColor(context, R.color.surface_variant))
             layoutParams = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
                 LinearLayout.LayoutParams.WRAP_CONTENT
@@ -1389,7 +1380,7 @@ class DialogManager(
         val alarmSwitchLabel = TextView(context).apply {
             text = if (isSpanish) "Alarma de SEGURIDAD anula modo silencio" else "SAFETY Alarm overrides silent mode"
             textSize = 14f
-            setTextColor(Color.parseColor("#333333"))
+            setTextColor(ContextCompat.getColor(context, R.color.text_primary))
             layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
         }
 
@@ -1462,9 +1453,9 @@ class DialogManager(
                 "Alerts will trigger when safety incidents are reported near your current location or your favorite places, within your chosen distance"
             }
             textSize = 14f
-            setTextColor(Color.parseColor("#666666"))
+            setTextColor(ContextCompat.getColor(context, R.color.text_secondary))
             setPadding(16, 16, 16, 16)
-            setBackgroundColor(Color.parseColor("#F5F5F5"))
+            setBackgroundColor(ContextCompat.getColor(context, R.color.surface_variant))
             layoutParams = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
                 LinearLayout.LayoutParams.WRAP_CONTENT
@@ -1477,7 +1468,7 @@ class DialogManager(
         // Close Button
         val btnClose = Button(context).apply {
             text = if (isSpanish) "Cerrar" else "Close"
-            setTextColor(Color.parseColor("#666666"))
+            setTextColor(ContextCompat.getColor(context, R.color.text_secondary))
             setBackgroundColor(Color.TRANSPARENT)
             setPadding(32, 16, 32, 16)
             layoutParams = LinearLayout.LayoutParams(
@@ -1525,14 +1516,14 @@ class DialogManager(
         val dialogLayout = LinearLayout(context).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(32, 32, 32, 32)
-            setBackgroundColor(Color.WHITE)
+            setBackgroundColor(ContextCompat.getColor(context, R.color.dialog_background))
             background = ContextCompat.getDrawable(context, R.drawable.white_card_background)
         }
 
         val titleText = TextView(context).apply {
             text = title
             textSize = 20f
-            setTextColor(Color.parseColor("#333333"))
+            setTextColor(ContextCompat.getColor(context, R.color.text_primary))
             gravity = android.view.Gravity.CENTER
             setPadding(0, 0, 0, 24)
         }
@@ -1550,9 +1541,9 @@ class DialogManager(
         val contentText = TextView(context).apply {
             text = content
             textSize = 14f
-            setTextColor(Color.parseColor("#333333"))
+            setTextColor(ContextCompat.getColor(context, R.color.text_primary))
             setPadding(16, 16, 16, 16)
-            setBackgroundColor(Color.parseColor("#F5F5F5"))
+            setBackgroundColor(ContextCompat.getColor(context, R.color.surface_variant))
             setLineSpacing(4f, 1f)
 
             // Make links clickable
@@ -1565,7 +1556,7 @@ class DialogManager(
 
         val btnClose = Button(context).apply {
             text = if (preferencesManager.getSavedLanguage() == "es") "Cerrar" else "Close"
-            setTextColor(Color.parseColor("#666666"))
+            setTextColor(ContextCompat.getColor(context, R.color.text_secondary))
             setBackgroundColor(Color.TRANSPARENT)
             setPadding(32, 24, 32, 24)
 
