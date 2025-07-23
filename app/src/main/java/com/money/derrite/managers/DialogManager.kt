@@ -1707,6 +1707,8 @@ class DialogManager(
                     "Incluso cuando la aplicación no está abierta, recibirás alertas automáticas de seguridad para tus lugares favoritos. El sistema monitorea continuamente tu área y lugares importantes, enviando notificaciones inmediatas cuando se reportan problemas de seguridad cerca.\n\n" +
                     "PRIVACIDAD PRIMERO\n" +
                     "Construido desde cero con la privacidad como principio fundamental. Nunca se almacenan, rastrean o comparten datos de usuario.\n\n" +
+                    "Compatible con dispositivos Android más antiguos\n" +
+                    "¡APLICACIÓN iOS PRÓXIMAMENTE!\n\n" +
                     "kindcode.us"
         } else {
             "MISSION\n" +
@@ -1721,6 +1723,8 @@ class DialogManager(
                     "Even when the app isn't open, you'll receive automatic safety alerts for your favorite places. The system continuously monitors your area and important locations, sending immediate notifications when safety concerns are reported nearby.\n\n" +
                     "PRIVACY FIRST\n" +
                     "Built from the ground up with privacy as the core principle. No user data is ever stored, tracked, or shared.\n\n" +
+                    "Compatible with older Android devices.\n" +
+                    "iOS APP COMING SOON!\n\n" +
                     "kindcode.us"
         }
     }
