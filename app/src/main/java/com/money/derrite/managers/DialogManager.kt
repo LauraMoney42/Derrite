@@ -911,11 +911,11 @@ class DialogManager(
             val photoImageView = android.widget.ImageView(context).apply {
                 layoutParams = LinearLayout.LayoutParams(
                     LinearLayout.LayoutParams.MATCH_PARENT,
-                    400
+                    600
                 ).apply {
                     setMargins(0, 0, 0, 24)
                 }
-                scaleType = android.widget.ImageView.ScaleType.CENTER_CROP
+                scaleType = android.widget.ImageView.ScaleType.FIT_CENTER
                 setBackgroundColor(ContextCompat.getColor(context, R.color.surface_variant))
             }
 
