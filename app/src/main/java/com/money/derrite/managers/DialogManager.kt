@@ -1611,8 +1611,8 @@ class DialogManager(
                     "• Recibe notificaciones cuando se hagan reportes de seguridad dentro de tu distancia elegida\n" +
                     "• Recibe alertas automáticas de seguridad cuando algo suceda cerca de tu ubicación actual y tus lugares favoritos\n" +
                     "• Personaliza la distancia de alerta en Configuración\n" +
-                    "• Las alertas de seguridad pueden sonar con volumen alto incluso cuando tu teléfono esté en modo silencio o no molestar\n" +
-                    "• Puedes activar o desactivar esta función en Configuración > Preferencias > 'Alarma anula modo silencio'\n\n" +
+                    "• Para alertas FUERTES incluso con teléfono silenciado: Ve a Configuración > Preferencias > Elige tu distancia de alerta > Activa 'Alarma anula modo silencio'\n" +
+                    "• Esto hace sonar una alarma fuerte para tu seguridad, sin importar si tu teléfono está silenciado, en modo no molestar, o la app está cerrada\n\n" +
                     "PRIVACIDAD\n" +
                     "• Completamente anónimo - no se requieren nombres de usuario\n" +
                     "• No se guardan direcciones IP, IDs de dispositivo, o información personal\n" +
@@ -1632,8 +1632,8 @@ class DialogManager(
                     "• Get notified when safety reports are made within your chosen distance\n" +
                     "• Receive automatic safety alerts when something happens near your current location and your favorite places\n" +
                     "• Customize alert distance in Settings\n" +
-                    "• Safety alerts can sound at full volume even when your phone is on silent or do not disturb mode\n" +
-                    "• You can enable or disable this feature in Settings > Preferences > 'Alarm overrides silent mode'\n\n" +
+                    "• For LOUD safety alerts even when your phone is silent: Go to Settings > Preferences > Choose your alert distance > Turn on 'Alarm overrides silent mode'\n" +
+                    "• This plays a loud alarm for your safety, no matter if your phone is silent, on do not disturb, or the app is closed\n\n" +
                     "PRIVACY\n" +
                     "• Completely anonymous - no usernames required\n" +
                     "• No IP addresses, device IDs, or personal information is stored\n" +
